@@ -16,7 +16,10 @@ JavaScript framework, no build tooling.
 The site is **pre-rendered, not client-rendered**: Python writes thousands of
 complete HTML pages at build time. Every panel, every ranked player's profile and
 every event draw is a static document, and the site works with **JavaScript
-switched off** — the output contains no `<script>` tag at all.
+switched off**.  The one exception is the head-to-head picker: two native
+`<select>` controls gain a ~15-line script in the page head that jumps to the
+pairing page once both players are chosen, and a `<noscript>` fallback keeps the
+plain-link flow for no-JS readers.  Everything else is CSS.
 
 | Page | 中文 | Contents |
 | --- | --- | --- |

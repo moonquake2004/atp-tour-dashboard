@@ -1298,3 +1298,18 @@ main:has(.player-grid:target) .player-grid#all:not(:target){display:none}
   .h2h-vs{padding:0;font-size:22px}
   .h2h-menu{max-height:300px}
 }
+
+/* 交手下拉所在的面板：菜单要浮出面板边界。
+   .panel 的 overflow:hidden 会把它在三行处裁断，下拉容器放开这一限制。 */
+.panel.h2h-overflow{overflow:visible}
+
+/* 原生 select 的关闭态外观与替换框一致；展开的候选列表由操作系统绘制 */
+select.h2h-native{width:100%;min-height:52px;padding:9px 12px;border-radius:10px;
+  border:1px solid rgba(217,172,78,.5);color:var(--ivory-hi);
+  font-family:var(--font-cn);font-size:14.5px;font-weight:600;cursor:pointer;
+  background:linear-gradient(165deg,rgba(34,140,95,.5),rgba(15,72,50,.8))}
+select.h2h-native:hover,select.h2h-native:focus{border-color:var(--gold-400);
+  outline:none;box-shadow:0 0 0 3px rgba(217,172,78,.16)}
+select.h2h-native option{padding:8px}
+.h2h-fallback-note{font-family:var(--font-cn);font-size:12px;color:var(--ivory-mute);
+  margin:16px 0 8px}
