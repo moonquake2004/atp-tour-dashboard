@@ -1255,3 +1255,46 @@ main:has(.player-grid:target) .player-grid#all:not(:target){display:none}
    长中文名按 38px 会折成两行，故用较小的中文等宽版本。 */
 .kpi-value.text{font-family:var(--font-cn);font-size:21px;line-height:1.22;
   letter-spacing:-0.01em;text-shadow:0 2px 6px rgba(0,0,0,.3)}
+
+/* ==========================================================================
+   交手选择器（仿 snooker：左 A 右 B 两个下拉，中间 VS）
+   --------------------------------------------------------------------------
+   <details>/<summary> 提供"点开才出现"的菜单；每个菜单项是真实的链接，
+   因此整个选择流程不需要任何脚本。菜单用绝对定位浮在正文之上，
+   宽度与外框一致；窄屏退回单列堆叠。
+   ========================================================================== */
+.h2h-composer{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);
+  gap:14px;align-items:start}
+.h2h-field{display:flex;flex-direction:column;gap:6px;min-width:0}
+.h2h-field-label{font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;
+  font-family:var(--font-ui);color:var(--gold-400);
+  display:flex;flex-wrap:wrap;align-items:baseline}
+.h2h-field-label .en{font-size:9px;opacity:.7;margin:0 0 0 5px}
+.h2h-select{position:relative}
+.h2h-select summary{list-style:none;cursor:pointer;display:flex;align-items:center;
+  gap:10px;min-height:52px;padding:9px 13px;border-radius:10px;
+  border:1px solid rgba(217,172,78,.45);
+  background:linear-gradient(165deg,rgba(34,140,95,.5),rgba(15,72,50,.8))}
+.h2h-select summary::-webkit-details-marker{display:none}
+.h2h-select summary:hover{border-color:var(--gold-400)}
+.h2h-select[open] summary{border-color:var(--gold-400);
+  box-shadow:0 0 0 3px rgba(217,172,78,.16)}
+.h2h-select summary .caret{margin-left:auto;font-family:var(--font-en);font-size:11px;
+  color:var(--gold-400);transition:transform .18s}
+.h2h-select[open] summary .caret{transform:rotate(180deg)}
+.h2h-select summary .ph{font-family:var(--font-cn);color:var(--ivory-mute)}
+.h2h-select summary .picked-en{font-family:var(--font-en);font-size:10px;opacity:.62}
+.h2h-menu{position:absolute;left:-1px;right:-1px;top:calc(100% + 8px);z-index:50;
+  border-radius:10px;overflow:hidden;border:1px solid rgba(217,172,78,.38);
+  max-height:430px;overflow-y:auto;background:rgba(6,18,13,.94)}
+.h2h-menu .h2h-pick-row{min-height:44px;background:transparent}
+.h2h-menu .h2h-pick-row:hover{background:rgba(42,176,114,.2)}
+.h2h-menu .h2h-pick-row .go{color:var(--gold-400)}
+.h2h-vs{align-self:center;justify-self:center;font-family:var(--font-en);
+  font-size:clamp(20px,2.6vw,34px);font-weight:800;color:var(--gold-400);
+  letter-spacing:.04em;padding:0 2px 20px}
+@media(max-width:760px){
+  .h2h-composer{grid-template-columns:1fr;gap:12px}
+  .h2h-vs{padding:0;font-size:22px}
+  .h2h-menu{max-height:300px}
+}

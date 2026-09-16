@@ -612,28 +612,53 @@ SEP = "|"
 
 
 def h2h_hub(ctx: Context, roster: list[dict]) -> str:
-    """Step one: choose the first player."""
-    cards = "".join(
-        f'<a class="h2h-pick-row" href="h2h-pick-{p["id"]}.html">'
-        f'{ctx.avatar(p, 30)}'
-        f'<span class="sn"><b>{esc(p.get("zh") or p["name"])}</b>'
-        f'<span class="en">{esc(p["name"])}</span></span>'
-        f'<span class="sr">#{p["rank"]} {esc(p["country"])}</span>'
-        f'<span class="go" aria-hidden="true">→</span></a>'
-        for p in roster
-    )
+    """
+    The comparison start page, laid out like the snooker dashboard: two labelled
+    select boxes — Player A on the left, Player B on the right — separated by
+    "VS".  Each box is a <details> whose menu items are plain links (pick pages),
+    so choosing either side starts a comparison without any script.
+
+    Both boxes cover the same roster, which is why either can be used to begin:
+    the second detail lives on the pick page, where Player A stays fixed while
+    the opponent menu opens.
+    """
+    def menu_items():
+        return "".join(
+            f'<a class="h2h-pick-row" href="h2h-pick-{p["id"]}.html">'
+            f'{ctx.avatar(p, 30)}'
+            f'<span class="sn"><b>{esc(p.get("zh") or p["name"])}</b>'
+            f'<span class="en">{esc(p["name"])}</span></span>'
+            f'<span class="sr">#{p["rank"]} {esc(p["country"])}</span>'
+            f'<span class="go" aria-hidden="true">→</span></a>'
+            for p in roster
+        )
+    menu = menu_items()
     total = len(roster) * (len(roster) - 1) // 2
     body = f'''
 <div class="wrap">
   {page_head("Head-to-head · 交手对比", "", "两位球员对比", "Compare two players",
-             "先选择球员一，再在他的页面上选择球员二，即可查看两人的完整交手记录与数据对比。",
-             "Pick a player first, then pick their opponent on the next page to see the full head-to-head record.")}
+             "先在左侧选择球员 A，再在右侧选择球员 B，即可查看两人的完整交手记录与数据对比。",
+             "Pick player A on the left, then player B on the right, to see the full head-to-head record.")}
   <div class="panel"><div class="card-bd">
-    <div class="h2h-steps">
-      <div class="h2h-step"><span class="n">1</span>{bi("选择球员一", "Pick player one")}</div>
-      <div class="h2h-step"><span class="n">2</span>{bi("再选球员二", "Then pick player two")}</div>
+    <div class="h2h-composer">
+      <div class="h2h-field">
+        <span class="h2h-field-label">{bi("球员 A", "Player A")}</span>
+        <details class="h2h-select">
+          <summary><span class="ph">{bi("点击选择球员", "Pick player one")}</span>
+            <span class="caret" aria-hidden="true">▾</span></summary>
+          <div class="h2h-menu">{menu}</div>
+        </details>
+      </div>
+      <div class="h2h-vs" aria-hidden="true">VS</div>
+      <div class="h2h-field">
+        <span class="h2h-field-label">{bi("球员 B", "Player B")}</span>
+        <details class="h2h-select">
+          <summary><span class="ph">{bi("点击选择球员", "Pick player two")}</span>
+            <span class="caret" aria-hidden="true">▾</span></summary>
+          <div class="h2h-menu">{menu}</div>
+        </details>
+      </div>
     </div>
-    <div class="h2h-column" style="max-height:none">{cards}</div>
     <p class="dim mt4" style="font-size:12px">{bi(
       f"可对比范围为当前排名前 {len(roster)} 的球员，共生成 {num(total)} 组对阵页。",
       f"Comparisons cover the current top {len(roster)}, generating {num(total)} pairing pages.")}</p>
@@ -644,38 +669,63 @@ def h2h_hub(ctx: Context, roster: list[dict]) -> str:
 
 
 def h2h_pick(ctx: Context, player: dict, opponents: list[dict]) -> str:
-    """Step two: choose this player's opponent."""
-    rank_line = bi(f"世界第 {player['rank']}", f"World No.{player['rank']}")
-
-    def row(opponent: dict) -> str:
-        key = _pair_key(player["id"], opponent["id"])
-        code = f'#{opponent["rank"]} ' if opponent.get("rank") else ""
-        return (
-            f'<a class="h2h-pick-row" href="h2h-{key.replace(SEP, "-")}.html">'
-            f'{ctx.avatar(opponent, 30)}'
-            f'<span class="sn"><b>{esc(opponent.get("zh") or opponent["name"])}</b>'
-            f'<span class="en">{esc(opponent["name"])}</span></span>'
-            f'<span class="sr">{esc(code + (opponent.get("country") or ""))}</span>'
+    """
+    The second half of the snooker-style composer: Player A is fixed in the left
+    box, and the right box is an openable opponent menu.  Player A's own box is
+    still a live details control listing the whole roster, so switching "A" is
+    one click away — matching the snooker dashboard, where both selects stay
+    editable above the record.
+    """
+    def roster_rows():
+        return "".join(
+            f'<a class="h2h-pick-row" href="h2h-pick-{p["id"]}.html">'
+            f'{ctx.avatar(p, 30)}'
+            f'<span class="sn"><b>{esc(p.get("zh") or p["name"])}</b>'
+            f'<span class="en">{esc(p["name"])}</span></span>'
+            f'<span class="sr">#{p["rank"]} {esc(p["country"])}</span>'
             f'<span class="go" aria-hidden="true">→</span></a>'
+            for p in ctx.pair_roster
         )
-
+    opponent_menu = "".join(
+        f'<a class="h2h-pick-row" href="h2h-{_pair_key(player["id"], o["id"]).replace(SEP, "-")}.html">'
+        f'{ctx.avatar(o, 30)}'
+        f'<span class="sn"><b>{esc(o.get("zh") or o["name"])}</b>'
+        f'<span class="en">{esc(o["name"])}</span></span>'
+        f'<span class="sr">{esc((f"#{o["rank"]} " if o.get("rank") else "") + (o.get("country") or ""))}</span>'
+        f'<span class="go" aria-hidden="true">→</span></a>'
+        for o in opponents
+    )
     body = f'''
 <div class="wrap">
-  <div class="sec-hd" style="border-bottom:0">
-    <div><span class="eyebrow">{bi("Head-to-head · 交手对比", "")}</span>
-      <h2 style="font-size:clamp(22px,3.2vw,34px)">{ctx.name(player)}</h2>
-      <div class="row wrap mt3" style="gap:14px;font-size:13px;color:var(--ivory-dim)">
-        <span>{rank_line}</span>
-        <span>{esc(ctx.zh.get("countries", {}).get(player.get("country") or "", player.get("country") or ""))}</span>
+  {page_head("Head-to-head · 交手对比", "", "两位球员对比", "Compare two players",
+             "左侧已选出球员 A；从右侧菜单选择球员 B，即可查看两人的完整交手记录与数据对比。",
+             "Player A is picked; open the menu on the right to choose player B.")}
+  <div class="panel"><div class="card-bd">
+    <div class="h2h-composer">
+      <div class="h2h-field">
+        <span class="h2h-field-label">{bi("球员 A", "Player A")}</span>
+        <details class="h2h-select">
+          <summary>
+            {ctx.avatar(player, 30)}
+            <span class="sn"><b>{esc(player.get("zh") or player["name"])}</b>
+              <span class="en">{esc(player["name"])}</span></span>
+            <span class="sr">#{player["rank"]} {esc(player.get("country") or "")}</span>
+            <span class="caret" aria-hidden="true">▾</span>
+          </summary>
+          <div class="h2h-menu">{roster_rows()}</div>
+        </details>
+      </div>
+      <div class="h2h-vs" aria-hidden="true">VS</div>
+      <div class="h2h-field">
+        <span class="h2h-field-label">{bi("球员 B", "Player B")}</span>
+        <details class="h2h-select">
+          <summary><span class="ph">{bi("点击选择对手", "Pick the opponent")}</span>
+            <span class="caret" aria-hidden="true">▾</span></summary>
+          <div class="h2h-menu">{opponent_menu}</div>
+        </details>
       </div>
     </div>
-    <a class="link" href="h2h.html">{bi("换一位球员", "Pick another player")} →</a>
-  </div>
-  <div class="panel">
-    <div class="panel-head"><h3>{bi("选择对手", "Pick the opponent")}</h3>
-      <span class="panel-note">{bi(f"当前排名前 {H2H_DEPTH} 内均可对比", f"anyone inside the current top {H2H_DEPTH}")}</span></div>
-    <div class="card-bd flush"><div class="h2h-column" style="max-height:none">{"".join(row(o) for o in opponents)}</div></div>
-  </div>
+  </div></div>
 </div>
 '''
     return shell(ctx, title=f'{player.get("zh") or player["name"]} · 交手', active="h2h.html", body=body)
