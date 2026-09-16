@@ -68,10 +68,15 @@ def overview(ctx: Context) -> str:
          bi(f"{num(counts.get('namedPlayers'))} 名球员", f"{num(counts.get('namedPlayers'))} players"),
          "var(--gold-500)"),
     ]
+        # 数值型用大号英文数字字体；文本型（如世界第一的球员名）用缩小的中文版式。
+    def _value_class(value: str) -> str:
+        return '' if str(value).lstrip().startswith(('#', '0', '1', '2', '3', '4', '5',
+                                                     '6', '7', '8', '9', '$')) or value in ('—',) else ' text'
+
     kpi_html = "".join(
         f'<div class="kpi" style="--kpi-accent:{accent}">'
         f'<div class="kpi-label">{bi(zh, en)}</div>'
-        f'<div class="kpi-value">{esc(value)}</div>'
+        f'<div class="kpi-value' + _value_class(value) + '">' + esc(value) + '</div>'
         f'<div class="kpi-sub">{sub}</div></div>'
         for zh, en, value, sub, accent in kpis
     )
