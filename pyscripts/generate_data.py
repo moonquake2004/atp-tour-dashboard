@@ -244,7 +244,21 @@ def main() -> int:
         if rows:
             meetings_out[key] = rows
 
-    # --------------------------------------------------------------- meta
+    # Leaderboard rows are built by derive.py before the Chinese names exist (zh
+    # runs after derive), so every row is injected here, mirroring the WTA
+    # builder's with_zh.  Rows whose only "Chinese" label is the Latin name keep
+    # the empty field and the templates fall back to the English name.
+    def with_zh(row: dict) -> dict:
+        return dict(row, zh=zh_name(row.get("id")))
+
+    boards_out = [
+        {**b, "rows": [with_zh(r) for r in b.get("rows") or []]}
+        for b in boards_in.get("boards") or []
+    ]
+    career_out = {
+        k: [with_zh(r) for r in rows]
+        for k, rows in (boards_in.get("career") or {}).items()
+    }
     season_events = [e for e in calendar if e["year"] == SEASON]
     meta = {
         "generatedAt": datetime.now(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z"),
@@ -278,8 +292,8 @@ def main() -> int:
         "results": recent,
         "champions": champions,
         "calendar": calendar,
-        "boards": boards_in.get("boards") or [],
-        "career": boards_in.get("career") or {},
+        "boards": boards_out,
+        "career": career_out,
         "tournamentZh": zh_tournaments,
         "playerIndex": [{"i": p["id"], "n": p["name"], "c": p["country"], "r": p["rank"],
                          "p": p["points"]} for p in rankings["players"]],
