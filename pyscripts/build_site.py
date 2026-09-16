@@ -47,7 +47,7 @@ def _pair_file(a: str, b: str) -> str:
     return f"h2h-{_pair_key(a, b).replace(SEP, '-')}.html"
 
 
-def _recent_matches(daily: dict, pid: str, limit: int = 40) -> list[dict]:
+def _recent_matches(daily: dict, tournaments: dict, pid: str, limit: int = 30) -> list[dict]:
     """
     A player's matches from the stored results, newest first.
 
@@ -68,8 +68,7 @@ def _recent_matches(daily: dict, pid: str, limit: int = 40) -> list[dict]:
             out.append({
                 "d": day,
                 "t": match["tournament"],
-                "r": "",
-                "sfc": "",
+                "svc": (tournaments.get(match.get("tournamentPath") or "") or {}).get("surface") or "",
                 "sc": " ".join(match.get("score") or []),
                 "w": won,
                 "oid": opponent.get("id") or "",
@@ -90,6 +89,7 @@ def main() -> int:
     h2h = load_globals("atp-h2h.js", "ATP_H2H")
     h2h_meetings = load_globals("atp-h2h-matches.js", "ATP_H2H_MATCHES")
     daily = json.loads((DATA_DIR / "results-daily.json").read_text(encoding="utf-8"))
+    tournaments = json.loads((DATA_DIR / "tournaments.json").read_text(encoding="utf-8"))
 
     ctx = Context(data, events, h2h)
     # The top N by ranking, which is the range pairing pages are generated for.
@@ -144,7 +144,8 @@ def main() -> int:
             })
         rivals.sort(key=lambda r: (-(r["wins"] + r["losses"]), r["player"].get("rank") or 9999))
         write(f"player-{pid}.html",
-              pages.player_page(ctx, player, rivals, _recent_matches(daily, pid)))
+              pages.player_page(ctx, player, rivals,
+                                _recent_matches(daily, tournaments, pid)))
     log("site", f"  ✓ {len(ctx.players)} player profiles")
 
     # Every other player named anywhere gets a compact page, so no link 404s.

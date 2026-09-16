@@ -24,7 +24,10 @@ from datetime import datetime, timezone
 from wtalib import ROOT, env_int, log, read_json
 
 SEASON = env_int("ATP_SEASON", datetime.now(timezone.utc).year)
-RESULT_LIMIT = env_int("ATP_RESULT_LIMIT", 1500)
+# The feed is the season's most recent results; the rest stay reachable through
+# each player's profile and each event's draw, so the page does not need to carry
+# thousands of rows.
+RESULT_LIMIT = env_int("ATP_RESULT_LIMIT", 600)
 MAX_PAIR_MEETINGS = env_int("ATP_H2H_MAX", 24)
 
 # Exhibition and training series that the source lists alongside tour events.

@@ -273,10 +273,13 @@ def rankings(ctx: Context) -> str:
             f"<tbody>{body}</tbody></table>"
         )
 
+    # The default view is emitted LAST: the other views hide it with the sibling
+    # combinator, which only reaches elements that come after them.
+    ordered = [k for k, _, _ in RANK_SORTS if k != "points"] + ["points"]
     tables = "".join(
         f'<div class="rank-body" id="sort-{key}"><div class="table-scroll">'
         f'{table(sorted(ctx.players, key=lambda p: _rank_key(p, key)))}</div></div>'
-        for key, _, _ in RANK_SORTS
+        for key in ordered
     )
 
     body = f'''
@@ -900,15 +903,26 @@ def _rival_row(ctx: Context, pid: str, rival: dict) -> str:
 
 
 def _match_row(ctx: Context, m: dict) -> str:
+    """
+    One match of the season log.
+
+    The results feed carries no round, and the surface is only known when the
+    event's draw was fetched, so the sub-line joins whichever parts exist rather
+    than printing empty separators.
+    """
     opponent = ctx.player(m["oid"])
     rank = f'<span class="num dim" style="font-size:11px">No.{m["orank"]}</span>' if m.get("orank") else ""
+    parts = [ctx.tournament(m["t"])]
+    if m.get("svc"):
+        parts.append(ctx.surface(m["svc"]))
+    sub = '<span class="dot">·</span>'.join(parts)
     return (
         f'<div class="match"><span class="m-date">{esc(short_date(m["d"]))}</span>'
         f'<span class="m-res {"w" if m.get("w") else "l"}">{"W" if m.get("w") else "L"}</span>'
         f'<span class="m-main"><span class="m-t">'
         f'<a class="m-name" href="player-{m["oid"]}.html">{esc(opponent.get("zh") or m.get("o") or "")}</a>'
         f'<span class="flag">{esc(m.get("oc") or "")}</span>{rank}</span>'
-        f'<span class="m-sub">{ctx.tournament(m["t"])} · {esc(m.get("r") or "")} · {ctx.surface(m.get("sfc"))}</span>'
+        f'<span class="m-sub">{sub}</span>'
         f'</span><span class="m-score">{esc(m["sc"])}</span></div>'
     )
 
