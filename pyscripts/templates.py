@@ -76,7 +76,8 @@ FAVICON = (
 )
 
 
-def shell(ctx: Context, *, title: str, active: str, body: str, description: str = "") -> str:
+def shell(ctx: Context, *, title: str, active: str, body: str,
+          description: str = "", jsonld: dict | None = None) -> str:
     """
     Wrap a page body in the shared document.
 
@@ -87,6 +88,14 @@ def shell(ctx: Context, *, title: str, active: str, body: str, description: str 
     # Sharing without our own card is worse than sharing the companion site's, so
     # the OG image is emitted only when BRAND sets one.
     og_meta = ""
+    # Structured data renders as an inert JSON-LD block: browsers never execute it
+    # (its type is application/ld+json), so the zero-script rule still holds for
+    # anything that runs.
+    ld_meta = ""
+    if jsonld:
+        ld_meta = ('<script type="application/ld+json">'
+                   + json.dumps(jsonld, ensure_ascii=False, separators=(',', ':'))
+                   + '</script>')
     if BRAND.get("og_image"):
         og_meta = (
             '<meta property="og:image" content="' + esc(BRAND["og_image"]) + '">'
@@ -121,8 +130,12 @@ def shell(ctx: Context, *, title: str, active: str, body: str, description: str 
 <meta property="og:locale" content="zh_CN">
 <meta property="og:locale:alternate" content="en_US">
 <meta name="twitter:card" content="summary_large_image">
+{ld_meta}
 <link rel="canonical" href="https://moonquake2004.github.io/{BRAND['repo']}/{active}">
+<link rel="icon" type="image/png" sizes="32x32" href="assets/icon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="assets/icon-16.png">
 <link rel="icon" href="{FAVICON}">
+<link rel="apple-touch-icon" sizes="180x180" href="assets/icon-180.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@500;700;900&family=Oswald:wght@400;500;600;700&family=Barlow+Condensed:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -212,12 +225,21 @@ def avatar(ctx: Context, player, size: int = 34, cls: str = "") -> str:
     return ctx.avatar(player, size, cls)
 
 
-def player_cell(ctx: Context, player, size: int = 32, country: bool = True) -> str:
+def player_cell(ctx: Context, player, size: int = 32, country: bool = True,
+                avatar_on: bool = True) -> str:
+    """
+    A player for a table row.
+
+    The secondary sort orders skip the portrait: three extra copies of 300
+    headshots would add most of a megabyte to a page that can only ever show one
+    of its tables, and the text cell reads fine without one.
+    """
     meta = ""
     if country and player.get("country"):
         meta = f'<div class="row" style="gap:7px;margin-top:2px">{ctx.country(player["country"])}</div>'
+    leading = avatar(ctx, player, size) if avatar_on else ""
     return (
-        f'<div class="p-cell">{avatar(ctx, player, size)}'
+        f'<div class="p-cell">{leading}'
         f'<div style="min-width:0">'
         f'<a class="p-name" href="player-{player["id"]}.html">{ctx.name(player)}</a>'
         f"{meta}</div></div>"

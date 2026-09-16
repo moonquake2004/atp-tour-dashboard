@@ -18,6 +18,7 @@ import shutil
 from pathlib import Path
 
 import pages
+from generate_data import EXHIBITION_MARKERS
 from render import Context
 from wtalib import DATA_DIR, ROOT, log
 
@@ -106,6 +107,9 @@ def main() -> int:
     if not src_assets.exists():
         raise SystemExit(f"missing {src_assets}")
     shutil.copytree(src_assets, out / "assets")
+    # favicon.ico lives at the site root so that crawlers find it without reading
+    # the markup; the per-size PNGs stay in assets/ alongside the touch icon.
+    (out / "favicon.ico").write_bytes((src_assets / "favicon.ico").read_bytes())
 
     written = 0
 
@@ -176,10 +180,17 @@ def main() -> int:
     log("site", f"  ✓ {draw_only} draw-only player pages")
 
     # ------------------------------------------------------------- event pages
+    # Exhibition and training series (the UTR sets most of all) are excluded from
+    # the calendar, so their draw pages are not generated either: they would be
+    # orphan documents of several hundred kilobytes each.
+    event_pages = 0
     for event in events.values():
+        if any(marker in event["name"].lower() for marker in EXHIBITION_MARKERS):
+            continue
         slug = event["path"].strip("/").split("/")[0]
         write(f'event-{slug}-{event["year"]}.html', pages.event_page(ctx, event))
-    log("site", f"  ✓ {len(events)} event pages")
+        event_pages += 1
+    log("site", f"  ✓ {event_pages} event pages")
 
     # ---------------------------------------------------------- head-to-head
     roster = ctx.pair_roster
@@ -202,11 +213,32 @@ def main() -> int:
         "Sitemap: https://moonquake2004.github.io/atp-tour-dashboard/sitemap.xml\n",
         encoding="utf-8",
     )
-    urls = ["index.html", "rankings.html", "players.html", "calendar.html",
-            "results.html", "stats.html", "h2h.html"]
+    # Full sitemap: the panels plus every page carrying unique content.  Compact
+    # pages for players outside the ranking table are deliberately left out — they
+    # are thin, and thousands of thin URLs dilute crawl priority for the rest.
+    lastmod = (ctx.meta.get("generatedAt") or "")[:10]
+    base_url = "https://moonquake2004.github.io/atp-tour-dashboard/"
+    entries = {u: "weekly" for u in (
+        "index.html", "rankings.html", "players.html", "calendar.html",
+        "results.html", "stats.html", "h2h.html",
+    )}
+    for player in ctx.players:
+        entries[f'player-{player["id"]}.html'] = "weekly"
+    for event in events.values():
+        if any(marker in event["name"].lower() for marker in EXHIBITION_MARKERS):
+            continue
+        slug = event["path"].strip("/").split("/")[0]
+        entries[f'event-{slug}-{event["year"]}.html'] = "monthly"
+    for player in roster:
+        entries[f'h2h-pick-{player["id"]}.html'] = "weekly"
+    for i, a in enumerate(roster):
+        for b in roster[i + 1:]:
+            low, high = min(a["id"], b["id"]), max(a["id"], b["id"])
+            entries[f'h2h-{low}-{high}.html'] = "monthly"
     sitemap = "\n".join(
-        f'  <url><loc>https://moonquake2004.github.io/atp-tour-dashboard/{u}</loc></url>'
-        for u in urls
+        f'  <url><loc>{base_url}{u}</loc><changefreq>{freq}</changefreq>'
+        f'<lastmod>{lastmod}</lastmod></url>'
+        for u, freq in entries.items()
     )
     (out / "sitemap.xml").write_text(
         '<?xml version="1.0" encoding="UTF-8"?>\n'
@@ -214,7 +246,7 @@ def main() -> int:
         f"{sitemap}\n</urlset>\n",
         encoding="utf-8",
     )
-    # GitHub Pages serves from docs/, and Jekyll must not process it.
+
     (out / ".nojekyll").write_text("", encoding="utf-8")
     log("site", "  ✓ robots.txt · sitemap.xml · .nojekyll")
 

@@ -171,7 +171,14 @@ def overview(ctx: Context) -> str:
 </div>
 '''
     return shell(ctx, title=f"{season} 赛季总览",
-                 active="index.html", body=body)
+                 active="index.html", body=body,
+                 jsonld={
+                     "@context": "https://schema.org",
+                     "@type": "WebSite",
+                     "name": "ATP Tour Data Dashboard",
+                     "inLanguage": "zh-CN",
+                     "url": "https://moonquake2004.github.io/atp-tour-dashboard/",
+                 })
 
 
 BOARD_ZH = {
@@ -249,13 +256,13 @@ def rankings(ctx: Context) -> str:
         for i, p in enumerate(top3)
     )
 
-    def table(rows: list[dict]) -> str:
+    def table(rows: list[dict], sort_key: str) -> str:
         def row(p: dict) -> str:
             age = p.get("age") if p.get("age") is not None else "—"
             high = f'#{p["highRank"]}' if p.get("highRank") else "—"
             return (
                 f'<tr><td>{p["rank"]}</td>'
-                f'<td class="l">{player_cell(ctx, p)}</td>'
+                f'<td class="l">{player_cell(ctx, p, avatar_on=(sort_key == "points"))}</td>'
                 f'<td class="c"><span class="tb-flag">{ctx.country(p["country"])}</span></td>'
                 f'<td>{ctx.move(p["move"])}</td>'
                 f'<td class="tb-num">{age}</td>'
@@ -278,7 +285,7 @@ def rankings(ctx: Context) -> str:
     ordered = [k for k, _, _ in RANK_SORTS if k != "points"] + ["points"]
     tables = "".join(
         f'<div class="rank-body" id="sort-{key}"><div class="table-scroll">'
-        f'{table(sorted(ctx.players, key=lambda p: _rank_key(p, key)))}</div></div>'
+        f'{table(sorted(ctx.players, key=lambda p: _rank_key(p, key)), key)}</div></div>'
         for key in ordered
     )
 
@@ -885,8 +892,23 @@ def player_page(ctx: Context, player: dict, rivals: list[dict], recent: list[dic
   </div>
 </div>
 '''
+    ld = {
+        "@context": "https://schema.org",
+        "@type": "Athlete",
+        "name": player["name"],
+        "alternateName": player.get("zh") or None,
+        "nationality": player.get("country") or None,
+        "birthDate": player.get("birth") or None,
+        "height": ({"@type": "QuantitativeValue", "value": player["height"], "unitCode": "CMT"}
+                   if player.get("height") else None),
+        "sport": "Tennis",
+        "jobTitle": "professional tennis player",
+        "url": f'https://moonquake2004.github.io/atp-tour-dashboard/player-{pid}.html',
+    }
+    ld = {k: v for k, v in ld.items() if v is not None}
     return shell(ctx, title=player.get("zh") or player["name"], active="players.html",
-                 body=body, description=f'{player["name"]} — 生涯战绩、场地胜率与交手记录。')
+                 body=body, description=f'{player["name"]} — 生涯战绩、场地胜率与交手记录。',
+                 jsonld=ld)
 
 
 def _rival_row(ctx: Context, pid: str, rival: dict) -> str:
@@ -1029,5 +1051,20 @@ def event_page(ctx: Context, event: dict) -> str:
   </div></div>
 </div>
 '''
+    dates = event.get("dates") or []
+    event_url = ('https://moonquake2004.github.io/atp-tour-dashboard/'
+                 f'event-{event["path"].strip("/").split("/")[0]}-{event["year"]}.html')
+    ld = {
+        "@context": "https://schema.org",
+        "@type": "SportsEvent",
+        "name": event["name"],
+        "sport": "Tennis",
+        "startDate": (dates[0] if dates else "") or None,
+        "endDate": (dates[-1] if dates else "") or None,
+        "location": event.get("country") or event.get("flag") or None,
+        "url": event_url,
+    }
+    ld = {k: v for k, v in ld.items() if v}
     return shell(ctx, title=f'{event["name"]} {event["year"]} · 赛果', active="calendar.html",
-                 body=body, description=f'{event["name"]} {event["year"]} 完整单打签表。')
+                 body=body, description=f'{event["name"]} {event["year"]} 完整单打签表。',
+                 jsonld=ld)
