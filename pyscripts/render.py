@@ -280,9 +280,13 @@ class Context:
         JavaScript is needed across the ~1,700 generated pages.
         """
         initials = "".join(w[:1] for w in str(player.get("name") or "?").split()[:2]).upper()
-        return (
-            f'<span class="av" style="--av:{size}px">'
-            f'<span class="av-mono" aria-hidden="true">{esc(initials)}</span>'
-            f'<img class="{esc(cls)}" src="{self.photo(player)}" alt="" loading="lazy" '
-            f'width="{size}" height="{size}"></span>'
-        )
+        src = self.photo(player)
+        img = ""
+        if src:
+            # Only emit the image when there is one: an empty src makes the browser
+            # request the page itself as an image, which shows up as a failed load.
+            img = (f'<img class="{esc(cls)}" src="{esc(src)}" alt="" loading="lazy" '
+                   f'width="{size}" height="{size}">')
+        return (f'<span class="av" style="--av:{size}px">'
+                f'<span class="av-mono" aria-hidden="true">{esc(initials)}</span>'
+                f'{img}</span>')

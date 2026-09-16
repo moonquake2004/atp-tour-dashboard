@@ -50,6 +50,10 @@ BRAND = {
     "note_en": ("An independent open-source project, not affiliated with the ATP. "
                 "Rankings, results and draws are republished from public sources and "
                 "remain the property of the ATP and those sources."),
+    # Social card.  The current PNG came from the companion WTA dashboard and
+    # belongs there, so the reference is empty until a card of our own exists —
+    # sharing a foreign brand image is worse than sharing none.
+    "og_image": "",
 }
 
 NAV = [
@@ -80,6 +84,15 @@ def shell(ctx: Context, *, title: str, active: str, body: str, description: str 
     is what lets `:target` drive the bilingual switch with no script.
     """
     season = ctx.season
+    # Sharing without our own card is worse than sharing the companion site's, so
+    # the OG image is emitted only when BRAND sets one.
+    og_meta = ""
+    if BRAND.get("og_image"):
+        og_meta = (
+            '<meta property="og:image" content="' + esc(BRAND["og_image"]) + '">'
+            '<meta property="og:image:width" content="1200">'
+            '<meta property="og:image:height" content="630">'
+        )
     nav = "".join(
         f'<a class="nav-link{" active" if href == active else ""}" href="{href}">'
         f'<span class="cn">{cn}</span><span class="en">{en}</span></a>'
@@ -103,7 +116,6 @@ def shell(ctx: Context, *, title: str, active: str, body: str, description: str 
 <meta property="og:type" content="website">
 <meta property="og:title" content="{esc(title)} | {esc(BRAND["title_suffix"])}">
 <meta property="og:description" content="{esc(desc)}">
-<meta property="og:image" content="assets/og-cover.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta property="og:locale" content="zh_CN">
@@ -224,7 +236,7 @@ def page_head(eyebrow_zh, eyebrow_en, title_zh, title_en, sub_zh="", sub_en="") 
     return (
         '<div class="sec-hd" style="border-bottom:0;margin-bottom:var(--sp-5);align-items:flex-end">'
         f'<div><span class="eyebrow">{bi(eyebrow_zh, eyebrow_en)}</span>'
-        f'<h2 style="font-size:clamp(26px,3.6vw,38px);letter-spacing:-0.03em">{bi(title_zh, title_en)}</h2>'
+        f'<h1 style="font-size:clamp(26px,3.6vw,38px);letter-spacing:-0.03em;margin:0">{bi(title_zh, title_en)}</h1>'
         f"{sub}</div></div>"
     )
 

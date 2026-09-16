@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
-One-shot data build: refresh every snapshot from the official WTA API and
+One-shot data build: refresh every snapshot from the published tour data and
 regenerate the derived aggregates and the published site.
 
     python3 pyscripts/build.py                    # full refresh
     python3 pyscripts/build.py --skip-players --skip-matches
-    WTA_RANK_DEPTH=100 python3 pyscripts/build.py
+    ATP_RANK_DEPTH=100 python3 pyscripts/build.py
 """
 
 from __future__ import annotations
@@ -21,11 +21,9 @@ STEPS = [
     ("rankings", "fetch_rankings.py", False),
     ("players", "fetch_players.py", True),
     ("matches", "fetch_matches.py", True),
-    ("tournaments", "fetch_tournaments.py", True),
     ("event-results", "fetch_events.py", True),
     ("h2h", "fetch_h2h.py", False),
     ("derive", "derive.py", False),
-    ("compact", "compact.py", False),
     ("zh", "fetch_zh.py", True),
     ("dashboard-data", "generate_data.py", False),
     ("dashboard-site", "build_site.py", False),
