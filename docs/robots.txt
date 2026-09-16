@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://moonquake2004.github.io/atp-tour-dashboard/sitemap.xml

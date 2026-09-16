@@ -1,0 +1,25 @@
+# macOS
+.DS_Store
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Editors
+.vscode/
+.idea/
+*.swp
+*~
+
+# Build-only artefacts (regenerated on demand)
+data/zh-variant-cache.json
+
+# Local scratch
+tmp/
+.cache/
+*.log
+
+# docs/ is generated but IS committed, because GitHub Pages serves it.
+!docs/

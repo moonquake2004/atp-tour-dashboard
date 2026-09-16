@@ -1,0 +1,18 @@
+{
+  "name": "atp-tour-dashboard",
+  "version": "1.0.0",
+  "private": true,
+  "description": "An independent bilingual data dashboard for the ATP Tour, built with the Python standard library from public tour data.",
+  "keywords": ["atp", "tennis", "dashboard", "rankings", "sports-data", "static-site", "python"],
+  "license": "MIT",
+  "engines": { "python": ">=3.11" },
+  "scripts": {
+    "build": "python3 pyscripts/build.py",
+    "refresh": "python3 pyscripts/refresh_rankings.py",
+    "data": "python3 pyscripts/generate_data.py",
+    "site": "python3 pyscripts/build_site.py",
+    "serve": "python3 pyscripts/serve.py",
+    "verify": "python3 pyscripts/verify.py && python3 pyscripts/verify_dashboard.py && python3 pyscripts/check_links.py",
+    "publish": "python3 pyscripts/generate_data.py && python3 pyscripts/build_site.py && python3 pyscripts/verify_dashboard.py"
+  }
+}
