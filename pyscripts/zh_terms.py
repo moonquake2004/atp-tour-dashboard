@@ -26,7 +26,7 @@ from wtalib import DATA_DIR, ROOT, SSL_CONTEXT, log
 
 VARIANT_CACHE = DATA_DIR / "zh-variant-cache.json"
 
-WIKI_UA = "wta-tour-dashboard/1.0 (open-source data dashboard; localisation)"
+WIKI_UA = "atp-tour-dashboard/1.0 (open-source data dashboard; localisation)"
 
 
 # Tournament level → Simplified Chinese.

@@ -170,7 +170,7 @@ def overview(ctx: Context) -> str:
   </div>
 </div>
 '''
-    return shell(ctx, title=f"{season} ATP 男子网球巡回赛 · 数据看板",
+    return shell(ctx, title=f"{season} 赛季总览",
                  active="index.html", body=body)
 
 

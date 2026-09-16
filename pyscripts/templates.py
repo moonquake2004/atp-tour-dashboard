@@ -23,6 +23,35 @@ from render import (
     timestamp,
 )
 
+# ---------------------------------------------------------------------------
+# Site identity
+#
+# Every piece of site branding lives here — titles, meta tags, the header, the
+# footer and the links out.  These templates are shared with the companion WTA
+# dashboard, so gathering the identity in one block is what keeps the two from
+# drifting: nothing below this point hard-codes a tour, a domain or a repository.
+# ---------------------------------------------------------------------------
+BRAND = {
+    "site_zh": "ATP 男子网球巡回赛 · 数据看板",
+    "site_en": "ATP Tour Data Dashboard",
+    "header_zh": "ATP 男子网球巡回赛 · 数据看板",
+    "header_en": "ATP TOUR · DATA DASHBOARD",
+    "title_suffix": "ATP 男子网球巡回赛数据看板",
+    "desc_zh": ("{season} 赛季 ATP 男子网球巡回赛数据看板："
+                "官方单打世界排名、赛程赛果、球员档案、场地胜率与历史交手记录。"),
+    "desc_en": ("Official ATP singles ranking, tour calendar and results, player "
+                "profiles, surface win rates and career head-to-head records."),
+    "author": "ATP Tour Dashboard contributors",
+    "repo": "atp-tour-dashboard",
+    "source_label": "tennisexplorer.com",
+    "source_url": "https://www.tennisexplorer.com/",
+    "note_zh": ("独立开源项目，与 ATP 无隶属关系。排名、赛果与签表数据转载自公开来源，"
+                "版权归 ATP 及各数据来源所有。"),
+    "note_en": ("An independent open-source project, not affiliated with the ATP. "
+                "Rankings, results and draws are republished from public sources and "
+                "remain the property of the ATP and those sources."),
+}
+
 NAV = [
     ("index.html", "总览", "Overview"),
     ("calendar.html", "赛程", "Calendar"),
@@ -57,8 +86,7 @@ def shell(ctx: Context, *, title: str, active: str, body: str, description: str 
         for href, cn, en in NAV
     )
     desc = description or (
-        f"{season} 赛季女子网球巡回赛数据看板：官方单打世界排名、赛程赛果、球员数据与历史交手记录。"
-        "Official WTA rankings, calendar, results, player records and head-to-heads."
+        BRAND["desc_zh"].format(season=season) + " " + BRAND["desc_en"]
     )
 
     return f"""<!DOCTYPE html>
@@ -66,14 +94,14 @@ def shell(ctx: Context, *, title: str, active: str, body: str, description: str 
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>{esc(title)} | 女子网球巡回赛数据看板</title>
+<title>{esc(title)} | {esc(BRAND["title_suffix"])}</title>
 <meta name="description" content="{esc(desc)}">
 <meta name="theme-color" content="#0f4832">
 <meta name="color-scheme" content="dark">
-<meta name="author" content="WTA Tour Dashboard contributors">
+<meta name="author" content="{esc(BRAND["author"])}">
 <meta name="robots" content="index, follow">
 <meta property="og:type" content="website">
-<meta property="og:title" content="{esc(title)} | 女子网球巡回赛数据看板">
+<meta property="og:title" content="{esc(title)} | {esc(BRAND["title_suffix"])}">
 <meta property="og:description" content="{esc(desc)}">
 <meta property="og:image" content="assets/og-cover.png">
 <meta property="og:image:width" content="1200">
@@ -81,7 +109,7 @@ def shell(ctx: Context, *, title: str, active: str, body: str, description: str 
 <meta property="og:locale" content="zh_CN">
 <meta property="og:locale:alternate" content="en_US">
 <meta name="twitter:card" content="summary_large_image">
-<link rel="canonical" href="https://moonquake2004.github.io/wta-tour-dashboard/{active}">
+<link rel="canonical" href="https://moonquake2004.github.io/{BRAND['repo']}/{active}">
 <link rel="icon" href="{FAVICON}">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -101,8 +129,8 @@ def shell(ctx: Context, *, title: str, active: str, body: str, description: str 
     <a class="brand" href="index.html">
       <span class="brand-ball" aria-hidden="true"></span>
       <span class="brand-text">
-        <strong class="brand-cn">女子网球巡回赛 · 数据看板</strong>
-        <span class="brand-en">WTA TOUR · DATA DASHBOARD</span>
+        <strong class="brand-cn">{esc(BRAND["header_zh"])}</strong>
+        <span class="brand-en">{esc(BRAND["header_en"])}</span>
       </span>
     </a>
     <div class="season-chip">
@@ -127,19 +155,16 @@ def shell(ctx: Context, *, title: str, active: str, body: str, description: str 
     <div class="footer-brand">
       <span class="brand-ball small" aria-hidden="true"></span>
       <div>
-        <strong>{bi("女子网球巡回赛 · 数据看板", "WTA Tour Data Dashboard")}</strong>
-        <p class="footer-note">{bi(
-            "独立开源项目，与 WTA 无隶属关系。球员数据版权归 WTA Tour, Inc. 所有。",
-            "An independent open-source project, not affiliated with the WTA. Player data © WTA Tour, Inc.",
-        )}</p>
+        <strong>{bi(BRAND["site_zh"], BRAND["site_en"])}</strong>
+        <p class="footer-note">{bi(BRAND["note_zh"], BRAND["note_en"])}</p>
       </div>
     </div>
     <div class="footer-row">{footer_stats(ctx)}</div>
     <div class="footer-bar">
       <span>{bi("数据来源", "Source")}
-        <a href="https://www.wtatennis.com/" target="_blank" rel="noopener">wtatennis.com</a></span>
+        <a href="{esc(BRAND["source_url"])}" target="_blank" rel="noopener">{esc(BRAND["source_label"])}</a></span>
       <span>{bi("最后更新", "Last updated")} <b>{esc(timestamp(ctx.meta.get("generatedAt")))}</b></span>
-      <a class="footer-gh" href="https://github.com/moonquake2004/wta-tour-dashboard" target="_blank" rel="noopener">
+      <a class="footer-gh" href="https://github.com/moonquake2004/{BRAND['repo']}" target="_blank" rel="noopener">
         <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.4 7.4 0 0 1 2-.27c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
         <span class="en">GitHub</span>
       </a>
