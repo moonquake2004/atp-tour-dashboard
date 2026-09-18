@@ -18,6 +18,7 @@ from render import (
     Context,
     bi,
     esc,
+    format_score,
     iso_date,
     num,
     pct,
@@ -50,23 +51,31 @@ def overview(ctx: Context) -> str:
     no1 = ctx.players[0] if ctx.players else None
     season = ctx.season
 
+    # Accent colours are stable tokens, mapped to semantic classes in style.css.
+    _accent_cls = {
+        "var(--gold-500)": "kpi-a1",
+        "var(--grass-400)": "kpi-a2",
+        "var(--line-white)": "kpi-a3",
+        "var(--grass-500)": "kpi-a4",
+        "var(--gold-400)": "kpi-a5",
+    }
     kpis = [
         ("排名球员", "Ranked players", num(counts.get("rankedPlayers")),
-         bi("单打世界排名收录", "singles ranking depth"), "var(--gold-500)"),
+         bi("单打世界排名收录", "singles ranking depth"), "kpi-a1"),
         ("赛季赛事", "Season events", num(counts.get("events")),
          bi(f"{counts.get('champions', 0)} 站已产生冠军", f"{counts.get('champions', 0)} with a champion"),
-         "var(--grass-400)"),
+         "kpi-a2"),
         ("赛季比赛", "Season matches", num(counts.get("seasonMatches")),
-         bi("已收录完整赛果", "complete results captured"), "var(--line-white)"),
+         bi("已收录完整赛果", "complete results captured"), "kpi-a3"),
         ("收录签表", "Draws", num(counts.get("eventDraws")),
-         bi("逐轮完整签表", "round-by-round draws"), "var(--grass-500)"),
+         bi("逐轮完整签表", "round-by-round draws"), "kpi-a4"),
         ("世界第一", "World No.1",
          (no1.get("zh") or no1.get("name")) if no1 else "—",
          bi(f"{num(no1.get('points'))} 积分", f"{num(no1.get('points'))} pts") if no1 else "",
-         "var(--gold-400)"),
+         "kpi-a5"),
         ("交手配对", "H2H pairings", num(counts.get("h2hPairings")),
          bi(f"{num(counts.get('namedPlayers'))} 名球员", f"{num(counts.get('namedPlayers'))} players"),
-         "var(--gold-500)"),
+         "kpi-a1"),
     ]
         # 数值型用大号英文数字字体；文本型（如世界第一的球员名）用缩小的中文版式。
     def _value_class(value: str) -> str:
@@ -74,7 +83,7 @@ def overview(ctx: Context) -> str:
                                                      '6', '7', '8', '9', '$')) or value in ('—',) else ' text'
 
     kpi_html = "".join(
-        f'<div class="kpi" style="--kpi-accent:{accent}">'
+        f'<div class="kpi {accent}">'
         f'<div class="kpi-label">{bi(zh, en)}</div>'
         f'<div class="kpi-value' + _value_class(value) + '">' + esc(value) + '</div>'
         f'<div class="kpi-sub">{sub}</div></div>'
@@ -203,7 +212,7 @@ def _board_mini(ctx: Context, board: dict) -> str:
             f'<div class="mini-row"><span class="n"><a href="player-{r["id"]}.html">'
             f'{esc(r.get("zh") or r["name"])}</a></span>'
             f'<span class="v">{pct(r["value"]) if board["unit"] == "%" else num(r["value"])}</span>'
-            f'<span class="mini-bar" style="grid-column:1/-1"><i style="width:'
+            f'<span class="mini-bar"><i style="width:'
             f'{max(2, (r["value"] / top * 100) if top else 2):.1f}%"></i></span></div>'
             for r in board["rows"][:5]
         )
@@ -237,7 +246,7 @@ def _result_row(ctx: Context, row: dict) -> str:
         "</div>"
         f'<div class="result-ev">{event}{ctx.surface_chip(row["surface"])}'
         f'{ctx.level_tag(row["level"])}</div></div>'
-        f'<div class="result-score">{esc(row["score"])}</div></div>'
+        f'<div class="result-score">{esc(format_score(row.get("score")))}</div></div>'
     )
 
 
@@ -308,7 +317,7 @@ def rankings(ctx: Context) -> str:
       <a class="seg" href="#sort-age">{bi("年龄", "Age")}</a>
       <a class="seg" href="#sort-move">{bi("变动", "Move")}</a>
     </div>
-    <span class="dim" style="font-size:11.5px">{bi("默认按排名先后", "Default order is by ranking")}</span>
+    <span class="dim sort-hint">{bi("默认按排名先后", "Default order is by ranking")}</span>
   </div>
   <div class="panel">
     <div class="rank-head"><div>
@@ -377,7 +386,7 @@ def _player_card(ctx: Context, player: dict) -> str:
     season = player.get("season") or {}
     wins, losses = season.get("w"), season.get("l")
     win_pct = _win_pct(wins, losses)
-    accent = "var(--gold-500)" if (wins or 0) > (losses or 0) and wins else "var(--hard-600)"
+    accent_cls = "pc-a-win" if (wins or 0) > (losses or 0) and wins else "pc-a-flat"
     age = player.get("age")
     age_text = f" · {age} 岁" if age is not None else ""
     career = player.get("career") or {}
@@ -386,7 +395,7 @@ def _player_card(ctx: Context, player: dict) -> str:
     hand = player.get("hand") or ""
     high = f'#{player["highRank"]}' if player.get("highRank") else "—"
     return (
-        f'<a class="player-card" href="player-{player["id"]}.html" style="--pc-accent:{accent}">'
+        f'<a class="player-card {accent_cls}" href="player-{player["id"]}.html">'
         f'<div class="pc-top">{ctx.avatar(player, 54)}'
         f'<div class="pc-id"><span class="pc-rank">No.{player["rank"]} · {num(player["points"])} pts</span>'
         f'<span class="pc-name">{bi(player.get("zh") or player["name"], player["name"])}</span>'
@@ -531,15 +540,57 @@ def _calendar_row(ctx: Context, event: dict, today: str) -> str:
 
 
 def results_page(ctx: Context) -> str:
-    items = "".join(_result_row(ctx, r) for r in ctx.results)
+    """
+    Season results grouped by month, with a tiny client-side filter.
+
+    Every group carries a month anchor so the page works with no script (the
+    chips just jump to the group).  The <input> filter is two lines of inline
+    JS: it matches against the per-row data-s attribute and hides rows and
+    empty groups.  Without JS the full list stays visible.
+    """
+    groups: dict[str, list[dict]] = {}
+    for r in ctx.results:
+        groups.setdefault((r.get("date") or "")[:7], []).append(r)
+    month_order = sorted(groups, reverse=True)
+
+    nav = "".join(
+        f'<a class="chip" href="#res-m-{esc(m)}">{esc(_month(m))}'
+        f'<span class="chip-n">{len(groups[m])}</span></a>'
+        for m in month_order
+    )
+    items = "".join(
+        f'<div class="res-group" id="res-m-{esc(m)}">'
+        f'<div class="cal-month-head"><span class="cn">{esc(_month(m))}</span>'
+        f'<span class="en">{esc(_month(m, True))}</span>'
+        f'<span class="cal-month-n">{bi(f"{len(groups[m])} 场", f"{len(groups[m])} matches")}</span></div>'
+        + "".join(_result_row(ctx, r) for r in groups[m])
+        + "</div>"
+        for m in month_order
+    ) or '<div class="empty-state">' + bi("暂无赛果", "No results yet") + "</div>"
+
+    filter_js = (
+        "<script>var q=document.getElementById('res-q'),rows=document.querySelectorAll('.result-row');"
+        "q.addEventListener('input',function(){var t=q.value.trim().toLowerCase();"
+        "rows.forEach(function(r){var hit=!t||(r.getAttribute('data-s')||'').indexOf(t)>-1;"
+        "r.style.display=hit?'':'none';"
+        "if(hit){var g=r.closest('.res-group');if(g)g.dataset.shown='yes'}});"
+        "document.querySelectorAll('.res-group').forEach(function(g){"
+        "g.style.display=(!t||g.dataset.shown==='yes')?'':'none';g.dataset.shown=''})});</script>"
+    )
+
     body = f'''
 <div class="wrap">
   {page_head("Results · 比赛结果", "", "赛季比赛结果", "Season results",
-             f'共 {num(len(ctx.results))} 场已收录赛果，按日期由新到旧。',
-             f'{num(len(ctx.results))} matches captured, newest first.')}
-  <div class="panel"><div class="result-list">{items
-    or '<div class="empty-state">' + bi("暂无赛果", "No results yet") + "</div>"}</div></div>
+             f'共 {num(len(ctx.results))} 场已收录赛果，按月份分组、支持按球员/赛事/比分检索。',
+             f'{num(len(ctx.results))} matches captured, grouped by month; filter by player, event or score.')}
+  <div class="res-tools">
+    <input id="res-q" class="res-search" type="search"
+           placeholder="{esc(bi("检索球员 / 赛事 / 比分…", "Search player, event or score…"))}" aria-label="Search results">
+    <div class="chips res-nav">{nav}</div>
+  </div>
+  <div class="panel"><div class="result-list">{items}</div></div>
 </div>
+{filter_js}
 '''
     return shell(ctx, title="赛果 · Results", active="results.html", body=body)
 
@@ -611,6 +662,11 @@ def _pair_key(a: str, b: str) -> str:
 SEP = "|"
 
 
+def _rank_country(p: dict) -> str:
+    """`#rank 国家` 组合，避免在 f-string 里嵌套同引号访问键。"""
+    return (f'#{p["rank"]} ' if p.get("rank") else "") + (p.get("country") or "")
+
+
 def _pair_options(ctx: Context, roster: list[dict], selected=None,
                   placeholder: str | None = None) -> str:
     """`<option>` 列表：snooker 式的「中文名 · 英文名（#rank）」标签。"""
@@ -643,7 +699,7 @@ def h2h_hub(ctx: Context, roster: list[dict]) -> str:
         f'{ctx.avatar(p, 30)}'
         f'<span class="sn"><b>{esc(p.get("zh") or p["name"])}</b>'
         f'<span class="en">{esc(p["name"])}</span></span>'
-        f'<span class="sr">#{p["rank"]} {esc(p["country"])}</span>'
+        f'<span class="sr">{esc(_rank_country(p))}</span>'
         f'<span class="go" aria-hidden="true">→</span></a>'
         for p in roster
     )
@@ -712,7 +768,7 @@ def h2h_pick(ctx: Context, player: dict, opponents: list[dict]) -> str:
         f'{ctx.avatar(o, 30)}'
         f'<span class="sn"><b>{esc(o.get("zh") or o["name"])}</b>'
         f'<span class="en">{esc(o["name"])}</span></span>'
-        f'<span class="sr">{esc((f"#{o["rank"]} " if o.get("rank") else "") + (o.get("country") or ""))}</span>'
+        f'<span class="sr">{esc(_rank_country(o))}</span>'
         f'<span class="go" aria-hidden="true">→</span></a>'
         for o in opponents
     )
@@ -779,9 +835,9 @@ def h2h_pair(ctx: Context, a: dict, b: dict, record: dict | None, meetings: list
     meeting_rows = "".join(meeting_row(m) for m in meetings) if meetings else ""
     body = f'''
 <div class="wrap">
-  <div class="sec-hd" style="border-bottom:0">
+  <div class="sec-hd page-plain">
     <div><span class="eyebrow">{bi("Head-to-head · 交手对比", "")}</span>
-      <h2 style="font-size:clamp(22px,3vw,32px)">{ctx.name(a)} <em style="font-style:italic;color:var(--ivory-mute)">vs</em> {ctx.name(b)}</h2>
+      <h2 class="page-title">{ctx.name(a)} <em class="vs-em">vs</em> {ctx.name(b)}</h2>
     </div>
     <a class="link" href="h2h.html">{bi("换一对球员", "Pick another pairing")} →</a>
   </div>
@@ -795,7 +851,7 @@ def h2h_pair(ctx: Context, a: dict, b: dict, record: dict | None, meetings: list
         <span class="meta">{rank_b} {esc(b.get("country") or "")}</span></div>
     </div>
     <div class="h2h-bar"><i class="a" style="width:{share:.1f}%"></i><i class="b" style="width:{100 - share:.1f}%"></i></div>
-    <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--ivory-mute);font-family:var(--font-cn)">
+    <div class="h2h-wins">
       <span>{esc(a.get("zh") or a["name"])} {aw} {bi("胜", "wins")}</span>
       <span>{esc(b.get("zh") or b["name"])} {bw} {bi("胜", "wins")}</span></div>
     {f'<div class="mp-sec"><h4>{bi(f"交手明细（{total} 场）", f"Meetings ({total})")}</h4>{meeting_rows}</div>'
@@ -809,7 +865,7 @@ def h2h_pair(ctx: Context, a: dict, b: dict, record: dict | None, meetings: list
     return shell(ctx, title=f"{title} · 交手", active="h2h.html", body=body)
 
 
-def _compare_block(ctx: Context, a: dict, b: dict) -> str:
+def _compare_block(ctx: Context, a: dict, b: dict, record: dict | None = None) -> str:
     titles_a = (a.get("titles") or {}).get("main")
     titles_b = (b.get("titles") or {}).get("main")
     season_a = a.get("season") or {}
@@ -827,6 +883,14 @@ def _compare_block(ctx: Context, a: dict, b: dict) -> str:
         return (f'<div class="cmp-row"><span class="a{wa}">{fa}</span>'
                 f'<span class="k">{bi(zh, en)}</span><span class="b{wb}">{fb}</span></div>')
 
+    record_row = ""
+    if record is not None:
+        aw, bw = record.get("aw", 0), record.get("bw", 0)
+        if aw or bw:
+            record_row = row("交手记录", "H2H record", aw, bw, "high")
+
+    chart = ctx.compare_svg(a, b)
+
     return (
         '<div class="h2h-compare mp-sec"><h4>' + bi("数据对比", "Statistical comparison") + "</h4>"
         + row("世界排名", "Ranking", a.get("rank"), b.get("rank"), "low")
@@ -843,6 +907,8 @@ def _compare_block(ctx: Context, a: dict, b: dict) -> str:
         + row("身高", "Height", f'{a["height"]} cm' if a.get("height") else None,
               f'{b["height"]} cm' if b.get("height") else None, "high")
         + row("持拍", "Plays", a.get("hand"), b.get("hand"))
+        + record_row
+        + (f'<div class="cmp-chart">{chart}</div>' if chart else "")
         + "</div>"
     )
 
@@ -863,15 +929,15 @@ def player_page(ctx: Context, player: dict, rivals: list[dict], recent: list[dic
     season_rows = "".join(
         f'<tr><td class="l num">{s["year"]}</td>'
         f'<td class="num dim">{(s.get("w") or 0) + (s.get("l") or 0)}</td>'
-        f'<td class="num" style="color:var(--grass-400)">{s.get("w")}</td>'
-        f'<td class="num" style="color:#e88a94">{s.get("l")}</td>'
+        f'<td class="num num-w">{s.get("w")}</td>'
+        f'<td class="num num-l">{s.get("l")}</td>'
         f'<td class="num">{pct(_win_pct(s.get("w"), s.get("l")))}</td></tr>'
         for s in (player.get("seasons") or [])
     )
 
     surface_rows = "".join(
-        f'<div class="lb-row" style="grid-template-columns:minmax(0,1fr) auto auto">'
-        f'<span class="lb-n dim" style="font-size:12.5px">{ctx.surface(name)}</span>'
+        f'<div class="lb-row surface-row">'
+        f'<span class="lb-n dim">{ctx.surface(name)}</span>'
         f'<span class="lb-v">{_record((split or {}).get("w"), (split or {}).get("l"))}</span>'
         f'<span class="lb-v">{pct(_win_pct((split or {}).get("w"), (split or {}).get("l")))}</span></div>'
         for name in ["Hard", "Clay", "Grass", "Indoors"]
@@ -882,7 +948,7 @@ def player_page(ctx: Context, player: dict, rivals: list[dict], recent: list[dic
     title_rows = "".join(
         f'<div class="mini-row"><span class="n"><b>{t["year"]}</b></span>'
         f'<span class="v">{t["main"]}</span>'
-        f'<span class="mini-bar" style="grid-column:1/-1">'
+        f'<span class="mini-bar t-events">'
         f'{esc(" · ".join(t.get("events") or []))}</span></div>'
         for t in (titles.get("byYear") or [])[:10]
     )
@@ -919,13 +985,23 @@ def player_page(ctx: Context, player: dict, rivals: list[dict], recent: list[dic
             f'<div class="card-bd flush"><div class="rivals">{rival_rows}</div></div></div>'
         )
 
+    trend_panel = ""
+    _trend_svg = ctx.trend_svg(player)
+    if _trend_svg:
+        trend_panel = (
+            '<div class="panel mt5"><div class="panel-head">'
+            f'<h3>{bi("赛季冠军走势", "Titles by season")}</h3>'
+            f'<span class="panel-note">{bi("主巡回赛冠军", "main-tour titles")}</span></div>'
+            f'<div class="card-bd">{_trend_svg}</div></div>'
+        )
+
     body = f'''
 <div class="wrap">
-  <div class="sec-hd" style="border-bottom:0">
+  <div class="sec-hd page-plain">
     <div><span class="eyebrow">{esc(ctx.zh.get("countries", {}).get(player["country"], player["country"]))}
       · {bi("单打", "Singles")}</span>
-      <h2 style="font-size:clamp(26px,4vw,42px);letter-spacing:-0.03em">{ctx.name(player)}</h2>
-      <div class="row wrap mt3" style="gap:14px;font-size:13px;color:var(--ivory-dim)">
+      <h2 class="page-title lg">{ctx.name(player)}</h2>
+      <div class="row wrap mt3 page-meta">
         {"".join(meta_bits)}
       </div>
     </div>
@@ -956,6 +1032,8 @@ def player_page(ctx: Context, player: dict, rivals: list[dict], recent: list[dic
       <div class="card-bd">{surface_rows or '<div class="empty-state">' + bi("暂无数据", "No data") + "</div>"}</div>
     </div>
   </div>
+
+  {trend_panel}
 
   {titles_panel}
 
@@ -1009,7 +1087,7 @@ def _match_row(ctx: Context, m: dict) -> str:
     than printing empty separators.
     """
     opponent = ctx.player(m["oid"])
-    rank = f'<span class="num dim" style="font-size:11px">No.{m["orank"]}</span>' if m.get("orank") else ""
+    rank = f'<span class="num dim m-rank">No.{m["orank"]}</span>' if m.get("orank") else ""
     parts = [ctx.tournament(m["t"])]
     if m.get("svc"):
         parts.append(ctx.surface(m["svc"]))
@@ -1021,7 +1099,7 @@ def _match_row(ctx: Context, m: dict) -> str:
         f'<a class="m-name" href="player-{m["oid"]}.html">{esc(opponent.get("zh") or m.get("o") or "")}</a>'
         f'<span class="flag">{esc(m.get("oc") or "")}</span>{rank}</span>'
         f'<span class="m-sub">{sub}</span>'
-        f'</span><span class="m-score">{esc(m["sc"])}</span></div>'
+        f'</span><span class="m-score">{esc(format_score(m.get("sc")))}</span></div>'
     )
 
 
@@ -1032,14 +1110,14 @@ def player_page_light(ctx: Context, player: dict) -> str:
         rank_line = "<span>" + bi(f"世界第 {player['rank']}", f"World No.{player['rank']}") + "</span>"
     body = f'''
 <div class="wrap">
-  <div class="sec-hd" style="border-bottom:0">
+  <div class="sec-hd page-head">
     <div><span class="eyebrow">{esc(ctx.zh.get("countries", {}).get(player.get("country") or "", player.get("country") or ""))}</span>
-      <h2 style="font-size:clamp(24px,3.4vw,38px)">{ctx.name(player)}</h2>
-      <div class="row wrap mt3" style="gap:14px;font-size:13px;color:var(--ivory-dim)">{rank_line}</div>
+      <h2 class="page-title">{ctx.name(player)}</h2>
+      <div class="row wrap mt3 page-meta">{rank_line}</div>
     </div>
     <a class="link" href="players.html">{bi("返回球员名录", "Back to players")} →</a>
   </div>
-  <p class="dim" style="font-size:12.5px">{bi(
+  <p class="dim light-note">{bi(
     "这位球员不在当前单打排名表内，因此本站没有他的档案与赛季统计；他参加过的比赛仍收录在赛果中。",
     "This player is outside the current singles ranking, so no profile or season statistics are published here; their matches are still in the results.")}</p>
 </div>
@@ -1105,10 +1183,10 @@ def event_page(ctx: Context, event: dict) -> str:
     span = f"{dates[0]} → {dates[-1]}" if dates else ""
     body = f'''
 <div class="wrap">
-  <div class="sec-hd" style="border-bottom:0">
+  <div class="sec-hd page-head">
     <div><span class="eyebrow">{ctx.level_tag(event.get("level"))} {ctx.surface_chip(event.get("surface"))}</span>
-      <h2 style="font-size:clamp(22px,3.4vw,36px)">{ctx.tournament(event["name"])}</h2>
-      <div class="row wrap mt3" style="gap:14px;font-size:12.5px;color:var(--ivory-dim)">
+      <h2 class="page-title">{ctx.tournament(event["name"])}</h2>
+      <div class="row wrap mt3 page-meta">
         <span>{esc(event["year"])}</span>
         {f"<span>{esc(span)}</span>" if span else ""}
         <span>{bi(f"{len(rounds)} 个轮次", f"{len(rounds)} rounds")}</span>

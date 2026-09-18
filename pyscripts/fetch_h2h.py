@@ -61,7 +61,7 @@ def main() -> int:
                 continue
 
             # The same match appears once per day it was listed; de-duplicate.
-            dedup = f"{day}|{wid}|{lid}|{' '.join(match.get('score') or [])}"
+            dedup = f"{day}|{wid}|{lid}|{score_text(match.get('score'))}"
             if dedup in seen:
                 continue
             seen.add(dedup)
@@ -83,7 +83,7 @@ def main() -> int:
                 "d": day,
                 "t": match["tournament"],
                 "tp": match.get("tournamentPath", ""),
-                "sc": " ".join(match.get("score") or []),
+                "sc": score_text(match.get("score")),
                 "w": wid,
                 "lo": lid,
                 "seedW": winner.get("seed", ""),

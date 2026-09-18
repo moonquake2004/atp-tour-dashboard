@@ -76,7 +76,7 @@ def main() -> int:
             log("results", f"{index}/{len(pending)} days…")
             _save(store, tournaments)
 
-    _save(store, tournaments)
+    _finalise(store, tournaments)
     _summarise(store, tournaments)
     return 0
 
@@ -86,6 +86,61 @@ def _save(store: dict, tournaments: dict) -> None:
     for entry in tournaments.values():
         entry["dates"].sort()
     write_json("data/tournaments.json", {k: tournaments[k] for k in sorted(tournaments)})
+
+
+def _finalise(store: dict, tournaments: dict) -> None:
+    """Idempotent closing step: recompute match totals, guard the caps, persist."""
+    _recompute_matches(store, tournaments)
+    _enforce_caps(tournaments)
+    _save(store, tournaments)
+
+
+def _recompute_matches(store: dict, tournaments: dict) -> None:
+    """Rebuild every tournament's match count from the stored days.
+
+    The total used to be accumulated while crawling, which duplicated matches
+    whenever a run resumed over days that had already been counted — the
+    biella-challenger 1001-match anomaly.  Recomputing from the store makes the
+    count idempotent: each (day, tournament) pair contributes exactly the matches
+    parsed for that day.
+    """
+    for entry in tournaments.values():
+        entry["matches"] = 0
+    for day_value in store.values():
+        for path, event in (day_value.get("tournaments") or {}).items():
+            entry = tournaments.get(path)
+            if entry is None:
+                continue
+            entry["matches"] += event.get("matches") or 0
+
+
+# Upper bounds for the number of completed singles matches an event of a given
+# level can plausibly contain.  The main draw of a Challenger caps at 128
+# (64 first-round matches), so any count near 1001 is a crawl artefact, not data.
+LEVEL_MATCH_CAPS = {
+    "Grand Slam": 127,
+    "ATP Tour": 127,
+    "Challenger": 127,
+    "Tour Finals": 15,
+    "Olympics": 63,
+    "Team Cup": 300,
+}
+DEFAULT_MATCH_CAP = 127
+
+
+def _cap_for(level: str) -> int:
+    return LEVEL_MATCH_CAPS.get(level, DEFAULT_MATCH_CAP)
+
+
+def _enforce_caps(tournaments: dict) -> None:
+    """Clamp and loudly log implausible match totals so they cannot pass silently."""
+    for path, entry in tournaments.items():
+        cap = _cap_for(entry.get("level") or "")
+        total = entry.get("matches") or 0
+        if total > cap:
+            log("results", f"CAP exceeded: {path} reports {total} matches "
+                           f"(> {cap} for level {entry.get('level')!r}); clamping to {cap}.")
+            entry["matches"] = cap
 
 
 def _summarise(store: dict, tournaments: dict) -> None:

@@ -50,10 +50,9 @@ BRAND = {
     "note_en": ("An independent open-source project, not affiliated with the ATP. "
                 "Rankings, results and draws are republished from public sources and "
                 "remain the property of the ATP and those sources."),
-    # Social card.  The current PNG came from the companion WTA dashboard and
-    # belongs there, so the reference is empty until a card of our own exists —
-    # sharing a foreign brand image is worse than sharing none.
-    "og_image": "",
+    # Social card.  The repository ships assets/og-cover.png as the default OG
+    # cover, so every page references it through the published site URL.
+    "og_image": "https://moonquake2004.github.io/atp-tour-dashboard/assets/og-cover.png",
 }
 
 NAV = [
@@ -97,6 +96,18 @@ def shell(ctx: Context, *, title: str, active: str, body: str,
         enhancer = ("\n<script>function h2hGo(f){var a=f.pa.value,b=f.pb.value;"
                     "if(!a||!b)return false;var s=[a,b].sort();"
                     "location.href='h2h-'+s[0]+'-'+s[1]+'.html';return false}</script>\n")
+    # Language preference memory: on click persist the choice, on load restore it.
+    # With JavaScript off the anchor links still work and Chinese is the default.
+    lang_memory = (
+        "\n<script>(function(){try{var K='atp-lang',L=localStorage.getItem(K);"
+        "function set(l){try{localStorage.setItem(K,l)}catch(e){}"
+        "document.documentElement.lang=l==='en'?'en':l==='cn'?'zh-CN':'zh-CN';}"
+        "var b=document.querySelectorAll('.lang-btn');"
+        "for(var i=0;i<b.length;i++)b[i].addEventListener('click',"
+        "function(){set(this.getAttribute('data-l'))});"
+        "if(L==='cn'||L==='en'||L==='both'){set(L);location.hash='lang-'+L;}"
+        "}catch(e){}})();</script>\n"
+    )
     # Sharing without our own card is worse than sharing the companion site's, so
     # the OG image is emitted only when BRAND sets one.
     og_meta = ""
@@ -209,6 +220,7 @@ def shell(ctx: Context, *, title: str, active: str, body: str,
   </div>
 </footer>
 </div><!-- /lang-ctx -->
+{lang_memory}
 </body>
 </html>
 """
@@ -248,11 +260,11 @@ def player_cell(ctx: Context, player, size: int = 32, country: bool = True,
     """
     meta = ""
     if country and player.get("country"):
-        meta = f'<div class="row" style="gap:7px;margin-top:2px">{ctx.country(player["country"])}</div>'
+        meta = f'<div class="row p-cell-meta">{ctx.country(player["country"])}</div>'
     leading = avatar(ctx, player, size) if avatar_on else ""
     return (
         f'<div class="p-cell">{leading}'
-        f'<div style="min-width:0">'
+        f'<div class="p-cell-main">'
         f'<a class="p-name" href="player-{player["id"]}.html">{ctx.name(player)}</a>'
         f"{meta}</div></div>"
     )
@@ -266,11 +278,11 @@ def top_nav(prefix: str = "") -> str:
 def page_head(eyebrow_zh, eyebrow_en, title_zh, title_en, sub_zh="", sub_en="") -> str:
     sub = ""
     if sub_zh or sub_en:
-        sub = f'<p class="muted" style="margin:10px 0 0;max-width:78ch">{bi(sub_zh, sub_en)}</p>'
+        sub = f'<p class="muted page-sub">{bi(sub_zh, sub_en)}</p>'
     return (
-        '<div class="sec-hd" style="border-bottom:0;margin-bottom:var(--sp-5);align-items:flex-end">'
+        '<div class="sec-hd page-head">'
         f'<div><span class="eyebrow">{bi(eyebrow_zh, eyebrow_en)}</span>'
-        f'<h1 style="font-size:clamp(26px,3.6vw,38px);letter-spacing:-0.03em;margin:0">{bi(title_zh, title_en)}</h1>'
+        f'<h1 class="page-title">{bi(title_zh, title_en)}</h1>'
         f"{sub}</div></div>"
     )
 
@@ -279,8 +291,7 @@ def stat_card(label_zh, label_en, value, sub_html="") -> str:
     return (
         '<div class="card"><div class="card-bd">'
         f'<div class="eyebrow">{bi(label_zh, label_en)}</div>'
-        f'<b class="num" style="display:block;font-size:30px;font-weight:500;'
-        f'letter-spacing:-0.035em;margin-top:4px">{esc(value)}</b>'
-        f'<div class="dim" style="font-size:12.5px">{sub_html}</div>'
+        f'<b class="num stat-num">{esc(value)}</b>'
+        f'<div class="dim stat-sub">{sub_html}</div>'
         "</div></div>"
     )

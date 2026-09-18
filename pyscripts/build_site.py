@@ -15,11 +15,13 @@ from __future__ import annotations
 import json
 import re
 import shutil
+import time
+import urllib.request
 from pathlib import Path
 
 import pages
 from generate_data import EXHIBITION_MARKERS
-from render import Context
+from render import Context, _set_avatar_dir
 from wtalib import DATA_DIR, ROOT, log
 
 
@@ -33,6 +35,48 @@ def load_globals(name: str, global_name: str):
     if not match:
         raise SystemExit(f"cannot parse {path}")
     return json.loads(match.group(1))
+
+
+def download_avatars(ctx: Context, avatars_dir: Path) -> int:
+    """
+    Fetch every referenced portrait once into ``docs/assets/avatars``.
+
+    Failure is non-fatal: any portrait that cannot be downloaded simply keeps the
+    upstream hotlink fallback, so the build never dies because a single CDN or
+    upstream request failed.
+    """
+    seen: set[str] = set()
+    for p in ctx.players:
+        ph = p.get("photo")
+        if ph:
+            seen.add(ph)
+    for e in ctx.h2h_players.values():
+        ph = e.get("photo") or e.get("p")
+        if ph:
+            seen.add(ph)
+    avatars_dir.mkdir(parents=True, exist_ok=True)
+    ok = 0
+    for ph in sorted(seen):
+        name = re.sub(r"[^A-Za-z0-9._-]", "_", ph.rsplit("/", 1)[-1])
+        target = avatars_dir / name
+        if target.exists():
+            ok += 1
+            continue
+        url = ph if ph.startswith("http") else f"https://www.tennisexplorer.com{ph}"
+        for attempt in range(2):
+            try:
+                req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+                with urllib.request.urlopen(req, timeout=15) as resp, target.open("wb") as fh:
+                    shutil.copyfileobj(resp, fh)
+                ok += 1
+                break
+            except Exception as exc:  # noqa: BLE001 — one portrait must not kill the build
+                if attempt == 1:
+                    log("avatar", f"  ! {ph} → {exc}")
+                else:
+                    time.sleep(1.5)  # back off — the upstream host rate-limits
+        time.sleep(0.15)
+    return ok
 
 
 SEP = "|"
@@ -110,6 +154,15 @@ def main() -> int:
     # favicon.ico lives at the site root so that crawlers find it without reading
     # the markup; the per-size PNGs stay in assets/ alongside the touch icon.
     (out / "favicon.ico").write_bytes((src_assets / "favicon.ico").read_bytes())
+
+    # Portraits are localised so the published site never hotlinks the upstream
+    # image host.  They are cached inside site-py/assets/avatars (which copytree
+    # above has just copied into docs/), so repeated builds skip already-downloaded
+    # files and a failed download keeps the hotlink fallback instead of dying.
+    avatars_cache = src_assets / "avatars"
+    fetched = download_avatars(ctx, avatars_cache)
+    _set_avatar_dir(out / "assets" / "avatars")
+    log("site", f"  ✓ {fetched} local avatars")
 
     written = 0
 

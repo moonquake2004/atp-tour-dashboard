@@ -115,7 +115,7 @@ def wikidata_cities(names: list[str]) -> dict[str, str]:
     return out
 
 
-def main() -> int:
+def _build() -> int:
     log("zh", "Building the Chinese localisation snapshot…")
 
     bios = read_json("bios.json", {}) or {}
@@ -253,6 +253,18 @@ def main() -> int:
         log("zh", f"  {len(uncovered)} events without a curated Chinese name (English is shown): "
                   f"{', '.join(sorted(uncovered)[:5])}…")
     return 0
+
+
+def main() -> int:
+    """Build the zh snapshot, falling back to the stored copy when offline."""
+    try:
+        return _build()
+    except Exception as err:  # noqa: BLE001 — Wikidata / variant converter unavailable
+        cached = read_json("zh.json", None) or {}
+        if not cached:
+            raise
+        log("zh", f"network unavailable ({err}) — keeping existing zh.json")
+        return 0
 
 
 if __name__ == "__main__":

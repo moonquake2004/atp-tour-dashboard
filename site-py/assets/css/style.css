@@ -1313,3 +1313,91 @@ select.h2h-native:hover,select.h2h-native:focus{border-color:var(--gold-400);
 select.h2h-native option{padding:8px}
 .h2h-fallback-note{font-family:var(--font-cn);font-size:12px;color:var(--ivory-mute);
   margin:16px 0 8px}
+
+/* ==========================================================================
+   改造新增语义类（KPI 强调色 / 页面头部 / 表格单元格 / 赛果检索 / SVG 图）
+   —— 由 pages.py / render.py / templates.py 中的重复内联 style 收敛而来。
+   ========================================================================== */
+
+/* --- KPI 卡片强调色（替代原内联 --kpi-accent 注入） --- */
+.kpi-a1{--kpi-accent:var(--gold-500)}
+.kpi-a2{--kpi-accent:var(--grass-400)}
+.kpi-a3{--kpi-accent:var(--line-white)}
+.kpi-a4{--kpi-accent:var(--hard-600)}
+.kpi-a5{--kpi-accent:var(--gold-400)}
+
+/* --- 球员卡强调色（胜场 / 平局等状态） --- */
+.pc-a-win{--pc-accent:var(--gold-500)}
+.pc-a-flat{--pc-accent:var(--hard-600)}
+
+/* --- 页面头部（page_head 统一头部） --- */
+.page-head{border-bottom:0;margin-bottom:20px;align-items:flex-end}
+.page-plain{border-bottom:0;margin-bottom:18px}
+.page-title{margin:0;font-size:clamp(22px,3vw,30px);letter-spacing:-0.02em}
+.page-title.lg{font-size:clamp(26px,4vw,40px);letter-spacing:-0.03em}
+.page-sub{margin:10px 0 0;max-width:78ch}
+.page-meta{gap:14px;font-size:13px;color:var(--ivory-dim)}
+.vs-em{font-style:italic;color:var(--ivory-mute)}
+.light-note{font-size:12.5px}
+.sort-hint{font-size:11.5px}
+
+/* --- 表格 / 行单元格 --- */
+.num-w{color:var(--grass-400)}
+.num-l{color:#e88a94}
+.lb-row.surface-row{grid-template-columns:minmax(0,1fr) auto auto}
+.surface-row .n b{font-size:12.5px}
+.m-rank{font-size:11px;font-family:var(--font-en)}
+.t-events{grid-column:1/-1;display:block}
+.r-rec{margin-left:auto;font-family:var(--font-en);font-weight:700;font-size:12px;
+  white-space:nowrap;color:var(--ivory-mute)}
+.r-rec.lead{color:var(--grass-400)}
+.r-rec.trail{color:#e88a94}
+
+/* --- 赛果检索（月份锚点 + 轻量过滤） --- */
+.res-tools{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;
+  align-items:center;margin:18px 0 8px}
+.res-search{width:100%;min-height:42px;padding:8px 14px;border-radius:10px;
+  background:rgba(0,0,0,.34);border:1px solid rgba(255,255,255,.1);
+  color:var(--ivory-hi);font-family:var(--font-ui);font-size:13.5px}
+.res-search:focus{border-color:rgba(42,176,114,.6);outline:none}
+.res-nav{display:flex;flex-wrap:wrap;gap:6px}
+.res-group{margin:6px 0 0;border-radius:var(--radius-sm);overflow:hidden;
+  background:rgba(255,255,255,.03)}
+.res-group[data-shown="no"]{display:none}
+
+/* --- 统计卡（球员详情页） --- */
+.stat-num{display:block;font-family:var(--font-en);font-size:28px;font-weight:700;
+  letter-spacing:-0.03em;margin-top:3px;color:var(--ivory-hi)}
+.stat-sub{font-size:12px;color:var(--ivory-mute)}
+
+/* --- 球员单元格 --- */
+.p-cell-main{min-width:0}
+.p-cell-meta{gap:7px;margin-top:2px}
+
+/* --- h2h 无脚本回退列 --- */
+.h2h-columns{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+.h2h-wins{display:flex;justify-content:space-between;font-size:11.5px;
+  color:var(--ivory-mute);font-family:var(--font-cn)}
+
+/* --- 球员对比 SVG（对称条形） --- */
+.cmp-chart{margin-top:14px;overflow-x:auto}
+.cmp-svg{display:block;width:100%;height:auto;font-family:var(--font-en)}
+.cmp-lbl{fill:var(--ivory-dim);font-size:11px}
+.cmp-lbl-en{fill:var(--ivory-mute);font-size:9px}
+.cmp-name-a{fill:var(--grass-400);font-weight:700}
+.cmp-name-b{fill:var(--gold-400);font-weight:700}
+.cmp-bar-a{fill:rgba(56,195,131,.55)}
+.cmp-bar-b{fill:rgba(217,172,78,.55)}
+.cmp-val{fill:var(--ivory-hi);font-weight:700}
+
+/* --- 排名走势 / 生涯趋势 SVG --- */
+.trend-box{display:block;width:100%;height:auto;font-family:var(--font-en)}
+.trend-bar{fill:rgba(56,195,131,.5)}
+.trend-tx{fill:var(--ivory-dim);font-size:9.5px}
+.trend-tx2{fill:var(--ivory-mute);font-size:8.5px}
+.trend-ax{stroke:rgba(255,255,255,.18);stroke-width:1}
+
+@media(max-width:760px){
+  .res-tools{grid-template-columns:1fr}
+  .h2h-columns{grid-template-columns:1fr}
+}

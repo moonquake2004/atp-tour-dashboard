@@ -333,14 +333,14 @@ def parse_player_detail(doc: str) -> dict:
         out["age"] = int(age.group(1))
         out["birth"] = f"{age.group(4)}-{int(age.group(3)):02d}-{int(age.group(2)):02d}"
 
-    sgl = re.search(r"singles:\s*([\d-]+)\.\s*/\s*([\d-]+)\.", blob)
+    sgl = re.search(r"singles:\s*([\d-]+)\.?\s*/\s*([\d-]+)\.", blob)
     if sgl:
         if sgl.group(1) != "-":
             out["rank"] = _int(sgl.group(1))
         if sgl.group(2) != "-":
             out["highRank"] = _int(sgl.group(2))
 
-    dbl = re.search(r"doubles:\s*([\d-]+)\.\s*/\s*([\d-]+)\.", blob)
+    dbl = re.search(r"doubles:\s*([\d-]+)\.?\s*/\s*([\d-]+)\.", blob)
     if dbl and dbl.group(2) != "-":
         out["highRankDoubles"] = _int(dbl.group(2))
 
@@ -665,12 +665,12 @@ def parse_results_day(doc: str) -> dict:
             # source artefact — neither is a result.
             if (pending is not None and parsed["player"]["name"] and pending["player"]["name"]
                     and parsed["player"]["id"] != pending["player"]["id"]
-                    and any(v.strip() for v in (pending["score"] or []))):
+                    and _has_score(pending["score"])):
                 matches.append({
                     "winner": pending["player"],
                     "loser": parsed["player"],
                     "sets": pending["sets"],
-                    "score": pending["score"],
+                    "score": _build_score(pending["score"], parsed["score"]),
                     "tournament": current["name"],
                     "tournamentPath": current["path"],
                     "time": pending["time"],
@@ -701,10 +701,13 @@ def _parse_result_row(row: str, row_id: str) -> dict:
     result_cell = re.search(r'<td class="result">(.*?)</td>', row, re.S)
     set_cells = re.findall(r'<td class="score">(.*?)</td>', row, re.S)
     # The last two score columns are the H and A odds; the rest are set scores.
-    scores = [text(c) for c in set_cells]
-    odds = scores[-2:] if len(scores) >= 2 and all(_is_odds(v) for v in scores[-2:]) else []
+    # A set cell reads "6" or "6<sup>5</sup>" — the <sup> carries the tiebreak
+    # points of the side that lost the set, which makes a full "7-6(5)".
+    odds_raw = [text(c) for c in set_cells]
+    odds = odds_raw[-2:] if len(odds_raw) >= 2 and all(_is_odds(v) for v in odds_raw[-2:]) else []
     if odds:
-        scores = scores[:-2]
+        set_cells = set_cells[:-2]
+    parsed_scores = _parse_score_cells(set_cells)
 
     return {
         "rowId": row_id,
@@ -716,7 +719,7 @@ def _parse_result_row(row: str, row_id: str) -> dict:
             "seed": seed,
         },
         "sets": _int(text(result_cell.group(1))) if result_cell else None,
-        "score": [v for v in scores if v not in ("", "\xa0")],
+        "score": parsed_scores,
         "odds": odds,
         "pending": None,
     }
@@ -724,6 +727,59 @@ def _parse_result_row(row: str, row_id: str) -> dict:
 
 def _is_odds(value: str) -> bool:
     return bool(re.fullmatch(r"\d{1,2}\.\d{2}", value.strip()))
+
+
+def _has_score(sets) -> bool:
+    """A parsed score array holds any real set games (not only walkover gaps)."""
+    return any((s or {}).get("g") for s in (sets or []))
+
+
+_SCORE_SUP = re.compile(r"<sup[^>]*>.*?</sup>", re.S)
+
+
+def _parse_score_cells(cells) -> list[dict]:
+    """
+    Parse score cells into {"g": games, "tb": tiebreak points}.
+
+    A set cell reads "6" or "7<sup>5</sup>" — the <sup> holds the tiebreak
+    points of the side that lost the set.  The sup block is stripped *before*
+    the games text is read, otherwise text() keeps the sup's digits as a
+    trailing " 5" and _build_score emits broken strings like "7 5-6 5(5)".
+    """
+    out: list[dict] = []
+    for cell in cells:
+        tb = re.search(r"<sup[^>]*>(\d+)</sup>", cell)
+        games = text(_SCORE_SUP.sub("", cell)).strip()
+        if games in ("", "\xa0"):
+            continue
+        out.append({"g": games, "tb": tb.group(1) if tb else None})
+    return out
+
+
+def _build_score(winner_sets, loser_sets) -> list[str]:
+    """
+    Pair a winner/loser row into standard tennis score strings.
+
+    Each set is parsed as {"g": games, "tb": tiebreak points} where the tiebreak
+    points sit in the losing side's <sup> cell — the source prints the loser's
+    games as "6<sup>5</sup>" for a 7-6(5) set.  When the two sides cannot be
+    aligned set by set the winner's raw games are kept (the old degraded form)
+    rather than inventing a score.
+    """
+    ws, ls = (winner_sets or []), (loser_sets or [])
+    if not ws or len(ws) != len(ls):
+        return [str((s or {}).get("g")) for s in ws]
+    out: list[str] = []
+    for w, l in zip(ws, ls):
+        wg, lg = (w or {}).get("g"), (l or {}).get("g")
+        if not wg or not lg:
+            continue
+        part = f"{wg}-{lg}"
+        tb = (w or {}).get("tb") or (l or {}).get("tb")
+        if tb:
+            part += f"({tb})"
+        out.append(part)
+    return out or [str((ws[0] or {}).get("g"))]
 
 
 # ---------------------------------------------------------------------------
@@ -816,7 +872,7 @@ def _parse_draw_row(row: str, year: int) -> dict | None:
     round_code = text(round_cell.group(2)) if round_cell else ""
 
     result_cell = re.search(r'<td class="result">(.*?)</td>', row, re.S)
-    scores = [text(c) for c in re.findall(r'<td class="score">(.*?)</td>', row, re.S)]
+    parsed_scores = _parse_score_cells(re.findall(r'<td class="score">(.*?)</td>', row, re.S))
 
     return {
         "date": date,
@@ -830,7 +886,7 @@ def _parse_draw_row(row: str, year: int) -> dict | None:
             "seed": seed.group(1) if seed else "",
         },
         "sets": _int(text(result_cell.group(1))) if result_cell else None,
-        "score": [v for v in scores if v not in ("", "\xa0")],
+        "score": parsed_scores,
     }
 
 

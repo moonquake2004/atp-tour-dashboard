@@ -21,7 +21,7 @@ from __future__ import annotations
 import json
 from datetime import datetime, timezone
 
-from wtalib import ROOT, env_int, log, read_json
+from wtalib import ROOT, env_int, log, read_json, score_text
 
 SEASON = env_int("ATP_SEASON", datetime.now(timezone.utc).year)
 # The feed is the season's most recent results; the rest stay reachable through
@@ -150,7 +150,7 @@ def main() -> int:
                 "path": match.get("tournamentPath", ""),
                 "surface": _surface_of(tournaments, match.get("tournamentPath", ""), day),
                 "level": _level_of(tournaments, match.get("tournamentPath", "")),
-                "score": " ".join(match.get("score") or []),
+                "score": score_text(match.get("score")),
                 "winner": display(winner["id"]),
                 "loser": display(loser["id"]),
                 "seedW": winner.get("seed", ""),
@@ -177,7 +177,7 @@ def main() -> int:
             "flag": event.get("flag") or "",
             "player": winner,
             "runnerUp": display(match["loser"]["id"]),
-            "score": " ".join(match.get("score") or []),
+            "score": score_text(match.get("score")),
         })
     champions.sort(key=lambda c: (c["date"], c["event"]), reverse=True)
 

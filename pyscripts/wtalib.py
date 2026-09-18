@@ -386,3 +386,35 @@ def env_int(name: str, default: int) -> int:
         return int(os.environ.get(name, default))
     except (TypeError, ValueError):
         return default
+
+
+def score_text(value) -> str:
+    """
+    Normalise a stored match score into standard tennis notation.
+
+    The parser writes each set as {"g": games, "tb": tiebreak points}; those
+    pair into "7-6(5)" strings.  Older snapshots kept only the winner's games
+    as a plain list of strings ("6", "6"); that shape cannot reconstruct the
+    loser's games or tiebreak points, so it is joined as stored rather than
+    inventing data.  Returns "—" for missing/empty values.
+    """
+    if value is None:
+        return "—"
+    if isinstance(value, str):
+        return value if value.strip() else "—"
+    if isinstance(value, (list, tuple)):
+        parts = []
+        for item in value:
+            if isinstance(item, dict):
+                g = item.get("g")
+                tb = item.get("tb")
+                s = str(g) if g is not None else ""
+                if tb:
+                    s = f"{s}({tb})"
+                parts.append(s)
+            else:
+                parts.append(str(item))
+        joined = " ".join(p for p in parts if p)
+        return joined if joined else "—"
+    s = str(value)
+    return s if s.strip() else "—"
