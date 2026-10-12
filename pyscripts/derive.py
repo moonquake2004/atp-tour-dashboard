@@ -39,6 +39,7 @@ def pct(won: int, lost: int) -> float | None:
 
 def main() -> int:
     bios = read_json("bios.json", {}) or {}
+    legends = read_json("legends.json", {}) or {}
     seasons = read_json("season-records.json", {}) or {}
     titles = read_json("titles.json", {}) or {}
     rankings = read_json("rankings-singles.json", {"players": []})
@@ -68,11 +69,18 @@ def main() -> int:
 
     rank_by_id = {p["id"]: p for p in rankings["players"]}
 
+    # Career boards span both the ranking table and the retired greats, which is
+    # what makes the list answer "most titles ever" rather than "among current
+    # players".  Season boards below stay active-only: a retired player has no
+    # current-season record to rank.
+    everyone = {**bios, **legends}
+
     def identity(pid: str) -> dict:
-        bio = bios.get(pid) or {}
+        bio = bios.get(pid) or legends.get(pid) or {}
         player = rank_by_id.get(pid) or {}
         return {
             "id": pid,
+            "retired": bool(bio.get("retired")),
             "name": bio.get("name") or player.get("name") or pid,
             "country": bio.get("country") or player.get("country") or "",
             "flag": bio.get("flag") or player.get("flag") or "",
@@ -85,7 +93,7 @@ def main() -> int:
         return table.get(str(SEASON)) or table.get(SEASON)
 
     def title_totals(pid: str) -> dict:
-        rows = titles.get(pid) or []
+        rows = titles.get(pid) or (legends.get(pid) or {}).get("titles") or []
         return {
             "main": sum(r.get("main", 0) for r in rows),
             "lower": sum(r.get("lower", 0) for r in rows),
@@ -123,7 +131,7 @@ def main() -> int:
 
     # ------------------------------------------------------------- titles
     title_rows = []
-    for pid in bios:
+    for pid in everyone:
         totals = title_totals(pid)
         if totals["main"] <= 0:
             continue
@@ -179,7 +187,7 @@ def main() -> int:
         })
 
     # ------------------------------------------------------------- career
-    career = [b for b in bios.values() if (b.get("career") or {}).get("w")]
+    career = [b for b in everyone.values() if (b.get("career") or {}).get("w")]
     career_wins = [
         {**identity(b["id"]), "value": b["career"]["w"],
          "l": b["career"]["l"], "pct": pct(b["career"]["w"], b["career"]["l"])}

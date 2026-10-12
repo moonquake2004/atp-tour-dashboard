@@ -61,6 +61,26 @@ data, both verified current at build time:
 | **Tennis Abstract** (Jeff Sackmann) | Official ranking cross-reference, Elo ratings | Its `/jsplayers/` and `/jsmatches/` paths are **disallowed by robots.txt** and are deliberately never requested |
 | **Wikidata** | Chinese player names (property **P536** = ATP player id) | Matched by name, then normalised to Simplified Chinese |
 
+### Career boards include retired champions
+
+The career leaderboards answer "who has won the most", so they span both the
+current ranking table and the retired greats — otherwise the list reads as an
+active-players-only table and Federer's 103, Nadal's 92 and Sampras' 33 are
+missing while Djokovic's 101 appears to lead.
+
+Retired champions are discovered rather than guessed: profile slugs are
+harvested from the tournament archive (where the source itself links each
+player), then each candidate is confirmed by parsing the page, and a record is
+kept only when the parsed **singles** title count clears 15.  A surname-only
+lookup would have been wrong — `borg` resolves to Sofie Borg and `wawrinka` to a
+different Wawrinka.
+
+Titles are counted from the `single_*` rows of each player's title table: the
+same table also carries `double_*` rows, and summing both had put the doubles
+specialist Jonas Bjorkman (40) above Agassi.  Retired players appear only on the
+career boards, marked with a "retired" badge — the season boards stay
+active-only, since a retired player has no current-season record to rank.
+
 ### What each page contributes
 
 | Page | Fields taken |
@@ -203,7 +223,8 @@ publishes its new list.
 - **Surface.** Taken from each event's own header, which is the only place the
   source states it. A handful of exhibition series publish no surface.
 - **Titles.** Counted from the title table on each player's page, split into main
-  tour and lower level.
+  tour and lower level.  Only the `single_*` rows count towards a singles title
+  board; the table's `double_*` rows are the doubles tally.
 - **Exhibitions.** The source lists exhibition and training series alongside tour
   events. They are excluded from the calendar, because they run intermittently all
   season and a "tournament" built from them would span hundreds of days.

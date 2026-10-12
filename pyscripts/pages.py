@@ -170,7 +170,7 @@ def overview(ctx: Context) -> str:
 
   <div class="panel">
     <div class="panel-head"><h3>{bi("生涯领跑", "Career Leaders")}</h3>
-      <span class="panel-note">{bi("现役排名球员中的历史累计", "All-time among currently ranked players")}</span></div>
+      <span class="panel-note">{bi("含退役名宿的历史累计", "All-time, retired champions included")}</span></div>
     <div class="career-grid">{career_html}</div>
   </div>
 </div>
@@ -214,7 +214,8 @@ def _board_mini(ctx: Context, board: dict) -> str:
 def _career_col(ctx: Context, zh, en, rows, fmt) -> str:
     inner = "".join(
         f'<div class="career-row"><span class="i">{i + 1}</span>'
-        f'<span class="n"><a href="player-{p["id"]}.html">{esc(p.get("zh") or p["name"])}</a></span>'
+        f'<span class="n"><a href="player-{p["id"]}.html">{esc(p.get("zh") or p["name"])}</a>'
+        f'{_retired_mark(p)}</span>'
         f'<span class="v">{fmt(p)}</span></div>'
         for i, p in enumerate(rows)
     )
@@ -561,7 +562,7 @@ def stats_page(ctx: Context) -> str:
   <div class="leader-grid">{cards}</div>
   <div class="panel">
     <div class="panel-head"><h3>{bi("生涯领跑 · 单打冠军", "All-Time Leaders · Singles titles")}</h3>
-      <span class="panel-note">{bi("现役排名球员中的历史累计", "All-time among currently ranked players")}</span></div>
+      <span class="panel-note">{bi("含退役名宿的历史累计", "All-time, retired champions included")}</span></div>
     <div class="career-grid">
       {_career_col(ctx, "生涯单打冠军", "Career titles", career.get("titles", []), lambda p: num(p.get("main") or p.get("value")))}
       {_career_col(ctx, "生涯胜场", "Career match wins", career.get("careerWins", []), lambda p: num(p.get("value") or p.get("w")))}
@@ -573,11 +574,18 @@ def stats_page(ctx: Context) -> str:
     return shell(ctx, title="数据 · Statistics", active="stats.html", body=body)
 
 
+def _retired_mark(row: dict) -> str:
+    """「已退役」徽章：让读者知道这一行不是现役球员。"""
+    if not row.get("retired"):
+        return ""
+    return f'<i class="ret-mark">{bi("退役", "Ret.")}</i>'
+
+
 def _leader_card(ctx: Context, board: dict) -> str:
     top = board["rows"][0]["value"] if board["rows"] else 1
     rows = "".join(
         f'<div class="lb-row"><span class="i">{i + 1}</span>{ctx.avatar(ctx.player(r["id"]), 28)}'
-        f'<span class="n"><b>{esc(r.get("zh") or r["name"])}</b>'
+        f'<span class="n"><b>{esc(r.get("zh") or r["name"])}</b>{_retired_mark(r)}'
         f'<span class="en">{esc(r["name"])}</span></span>'
         f'<span class="v">{pct(r["value"]) if board["unit"] == "%" else num(r["value"])}</span>'
         f'<span class="lb-bar"><i style="width:{max(2, (r["value"] / top * 100) if top else 2):.1f}%"></i></span></div>'
@@ -892,8 +900,23 @@ def player_page(ctx: Context, player: dict, rivals: list[dict], recent: list[dic
 
     age = player.get("age")
     high = f'No.{player["highRank"]}' if player.get("highRank") else "—"
-    meta_bits = [bi(f"世界第 {player['rank']}", f"World No.{player['rank']}"),
-                 f'<span>{num(player["points"])} {bi("积分", "pts")}</span>']
+    # 退役名宿没有当前赛季记录，用一枚徽章说明，而不是显示「2026 胜负 —」
+    if player.get("retired"):
+        season_tile = ('<div class="tile"><b>'
+                       + bi("已退役", "Retired") +
+                       '</b><small>' + bi("当前赛季无参赛记录", "no current-season matches") + '</small></div>')
+        rank_line_head = ""
+    else:
+        season_tile = (f'<div class="tile"><b>{_record(season.get("w"), season.get("l"))}</b>'
+                       f'<small>{bi(f"{ctx.season} 胜负", f"{ctx.season} W–L")}</small></div>')
+        rank_line_head = bi(f"世界第 {player['rank']}", f"World No.{player['rank']}")
+
+    meta_bits = []
+    if not player.get("retired") and player.get("rank") is not None:
+        meta_bits.append(rank_line_head)
+        meta_bits.append(f'<span>{num(player["points"])} {bi("积分", "pts")}</span>')
+    else:
+        meta_bits.append(f'<span class="ret-mark">{bi("已退役", "Retired")}</span>')
     if age is not None:
         meta_bits.append(f'<span>{age} {bi("岁", "yrs")}</span>')
     if player.get("height"):
@@ -933,7 +956,7 @@ def player_page(ctx: Context, player: dict, rivals: list[dict], recent: list[dic
   </div>
 
   <div class="tiles">
-    <div class="tile"><b>{_record(season.get("w"), season.get("l"))}</b><small>{bi(f"{ctx.season} 胜负", f"{ctx.season} W–L")}</small></div>
+    {season_tile}
     <div class="tile"><b>{num(titles.get("main"))}</b><small>{bi("生涯冠军", "Career titles")}</small></div>
     <div class="tile"><b>{_record(career.get("w"), career.get("l"))}</b><small>{bi("生涯胜负", "Career W–L")}</small></div>
     <div class="tile"><b>{pct(_win_pct(career.get("w"), career.get("l")))}</b><small>{bi("生涯胜率", "Career win rate")}</small></div>

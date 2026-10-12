@@ -23,6 +23,7 @@ STEPS = [
     ("matches", "fetch_matches.py", True),
     ("event-results", "fetch_events.py", True),
     ("h2h", "fetch_h2h.py", False),
+    ("legends", "fetch_legends.py", True),
     ("derive", "derive.py", False),
     ("zh", "fetch_zh.py", True),
     ("dashboard-data", "generate_data.py", False),

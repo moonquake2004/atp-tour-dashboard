@@ -130,9 +130,19 @@ def main() -> int:
         wanted[player["id"]] = player["name"]
     for pid, bio in bios.items():
         wanted.setdefault(pid, bio.get("name", ""))
+    # 退役名宿同样取中文名（费德勒/纳达尔等在 Wikidata 均有标签）
+    for pid, legend in (read_json("legends.json", {}) or {}).items():
+        wanted.setdefault(pid, legend.get("name", ""))
 
-    log("zh", f"  {len(wanted)} ranked players need a Chinese name")
-    by_english = wikidata_players()
+    log("zh", f"  {len(wanted)} players need a Chinese name")
+    # Wikidata is a best-effort source: when it is unreachable the curated
+    # transliteration table below still resolves the well-known names, so a
+    # transient outage must not abort the build.
+    try:
+        by_english = wikidata_players()
+    except Exception as err:  # noqa: BLE001 — any network failure
+        log("zh", f"  ! Wikidata unavailable ({str(err)[:60]}…), using curated names only")
+        by_english = {}
 
     # Index Wikidata by token set so name order and spelling do not matter.
     by_tokens: dict[frozenset, str] = {}
@@ -227,6 +237,16 @@ def main() -> int:
 
     if latin_only:
         log("zh", f'  discarded {latin_only} Latin-only "Chinese" label(s)')
+
+    # Merge with what is already on disk: Wikidata is best-effort, and an outage
+    # must not wipe names resolved on earlier runs.  Existing entries win only
+    # when the new run could not resolve them.
+    previous = read_json("zh.json", {}) or {}
+    for pid, name in (previous.get("players") or {}).items():
+        players_final.setdefault(pid, name)
+    for name, label in (previous.get("tournaments") or {}).items():
+        if label and not tournaments_final.get(name):
+            tournaments_final[name] = label
 
     write_json("data/zh.json", {
         "generatedAt": datetime.now(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z"),

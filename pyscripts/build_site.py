@@ -179,6 +179,28 @@ def main() -> int:
             draw_only += 1
     log("site", f"  ✓ {draw_only} draw-only player pages")
 
+    # ------------------------------------------------- retired champions
+    # 名宿的档案页：生涯/分赛季/冠军/场地胜率是全的；交手与本赛季比赛为空，
+    # 因为收录的赛果窗口（2023 年至今）在他们退役之后。
+    legends = data.get("legends") or []
+    for legend in legends:
+        rivals = []
+        for other in rival_ids:
+            record = ctx.h2h_pairs.get(_pair_key(legend["id"], other))
+            if not record:
+                continue
+            is_low = legend["id"] < other
+            rivals.append({
+                "id": other,
+                "player": ctx.player(other),
+                "wins": record["aw"] if is_low else record["bw"],
+                "losses": record["bw"] if is_low else record["aw"],
+            })
+        write(f'player-{legend["id"]}.html',
+              pages.player_page(ctx, legend, rivals,
+                                _recent_matches(daily, tournaments, legend["id"])))
+    log("site", f"  ✓ {len(legends)} retired champion profiles")
+
     # ------------------------------------------------------------- event pages
     # Exhibition and training series (the UTR sets most of all) are excluded from
     # the calendar, so their draw pages are not generated either: they would be
@@ -229,6 +251,8 @@ def main() -> int:
             continue
         slug = event["path"].strip("/").split("/")[0]
         entries[f'event-{slug}-{event["year"]}.html'] = "monthly"
+    for legend in data.get("legends") or []:
+        entries[f'player-{legend["id"]}.html'] = "monthly"
     for player in roster:
         entries[f'h2h-pick-{player["id"]}.html'] = "weekly"
     for i, a in enumerate(roster):

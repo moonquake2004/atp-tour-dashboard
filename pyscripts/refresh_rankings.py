@@ -20,6 +20,7 @@ from wtalib import ROOT, log
 STEPS = [
     "fetch_rankings.py",
     "fetch_events.py",   # completed events gain champions and results weekly
+    "fetch_legends.py",  # retired greats, so the career boards include them
     "derive.py",
     "fetch_zh.py",       # newly ranked players need Chinese names
     "generate_data.py",

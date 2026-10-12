@@ -60,6 +60,7 @@ def main() -> int:
     calendar_src = (read_json("calendar.json", {}) or {}).get("events") or []
     daily = read_json("results-daily.json", {}) or {}
     boards_in = read_json("leaderboards.json", {"boards": [], "career": {}}) or {}
+    legends = read_json("legends.json", {}) or {}
     h2h = read_json("h2h.json", {}) or {}
     h2h_names = read_json("h2h-names.json", {}) or {}
     zh = read_json("zh.json", {}) or {}
@@ -78,14 +79,19 @@ def main() -> int:
         player = rank_by_id.get(pid)
         bio = bios.get(pid) or {}
         entry = h2h_names.get(pid) or {}
+        legend = legends.get(pid) or {}
         return {
             "id": pid,
-            "name": bio.get("name") or (player or {}).get("name") or entry.get("n") or f"#{pid}",
+            "name": (bio.get("name") or legend.get("name") or (player or {}).get("name")
+                     or entry.get("n") or f"#{pid}"),
             "zh": zh_name(pid),
-            "country": bio.get("country") or (player or {}).get("country") or entry.get("c") or "",
+            "country": (bio.get("country") or legend.get("country")
+                        or (player or {}).get("country") or entry.get("c") or ""),
             "flag": bio.get("flag") or (player or {}).get("flag") or entry.get("f") or "",
             "rank": bio.get("rank") or (player or {}).get("rank") or entry.get("r"),
-            "photo": bio.get("photo") or entry.get("p") or "",
+            "photo": (bio.get("photo") or legend.get("photo")
+                      or entry.get("p") or entry.get("photo") or ""),
+            "retired": bool(legend.get("retired")),
         }
 
     # ------------------------------------------------------------- players
@@ -286,7 +292,36 @@ def main() -> int:
         },
     }
 
+    legends_out = []
+    for pid, legend in legends.items():
+        lz = zh_name(pid)
+        legends_out.append({
+            "id": pid, "slug": legend.get("slug") or pid, "name": legend["name"],
+            "zh": lz, "country": legend.get("country") or "", "flag": legend.get("flag") or "",
+            "rank": None, "points": None, "move": None, "retired": True,
+            "age": legend.get("age"), "birth": legend.get("birth") or "",
+            "height": legend.get("height"), "weight": legend.get("weight"),
+            "hand": legend.get("hand") or "", "highRank": legend.get("highRank"),
+            "photo": legend.get("photo") or "",
+            "career": legend.get("career") or {},
+            "careerBySurface": legend.get("careerBySurface") or {},
+            "season": None,
+            "titles": {
+                "main": legend.get("titleCount") or 0,
+                "lower": sum(t.get("lower", 0) for t in legend.get("titles") or []),
+                "byYear": [{"year": t["year"], "main": t["main"], "lower": t["lower"],
+                            "events": t.get("events") or []}
+                           for t in sorted(legend.get("titles") or [], key=lambda x: -x["year"])[:12]],
+            },
+            "seasons": [{"year": int(y), "w": (r.get("total") or {}).get("w"),
+                         "l": (r.get("total") or {}).get("l")}
+                        for y, r in sorted((legend.get("seasons") or {}).items(),
+                                           key=lambda kv: -int(kv[0]))[:12]
+                        if r.get("total")],
+        })
+
     payload = {
+        "legends": legends_out,
         "meta": meta,
         "players": players_out,
         "results": recent,

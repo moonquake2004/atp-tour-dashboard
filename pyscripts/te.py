@@ -162,6 +162,18 @@ def attr(fragment: str, name: str) -> str:
     return html_module.unescape(match.group(1)) if match else ""
 
 
+# Every player reference in a draw or result row.
+PLAYER_LINK = re.compile(r'href="(/player/([^"/]+)/?)"[^>]*>(.*?)</a>', re.S)
+
+
+def page_name(doc: str) -> str:
+    """The subject of a player page, taken from its <title>."""
+    match = re.search(r"<title>([^<]*)</title>", doc)
+    if not match:
+        return ""
+    return match.group(1).replace(" - Tennis Explorer", "").strip()
+
+
 def player_id(slug: str) -> str:
     """
     The identity used for a player: the whole slug.
@@ -424,6 +436,13 @@ def parse_player_titles(doc: str) -> list[dict]:
     current: dict | None = None
     for row in rows(table):
         if 'class="head"' in row:
+            continue
+        # A year appears twice for players who also won doubles: `single_2008`
+        # and `double_2008`.  Only the singles tally belongs on a singles-title
+        # board — Bjorkman's page is entirely doubles, and counting both put him
+        # above Agassi.
+        key = re.search(r'data-ykey="([a-z]+)_', row)
+        if key and key.group(1) != "single":
             continue
         values = [text(c) for c in cells(row)]
         values = [v for v in values if v != ""]
