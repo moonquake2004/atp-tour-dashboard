@@ -18,6 +18,8 @@ from __future__ import annotations
 
 import html
 import json
+import os
+import re
 from datetime import datetime, timezone
 
 from wtalib import ROOT
@@ -71,6 +73,93 @@ def money_short(value) -> str:
     if value >= 1_000:
         return f"${value / 1_000:.0f}K"
     return f"${value:,.0f}"
+
+
+def format_score(value) -> str:
+    """
+    Normalise a stored score into standard tennis notation.
+
+    Accepts the shapes the pipeline produces:
+      · a plain string            -> returned as-is
+      · a list of strings         -> joined with spaces ("6 3" -> "6 3")
+      · a list of dicts           -> each dict is {"g": games, "tb": tiebreak},
+                                     rendered as "7-6(5)"
+      · missing/empty             -> "—"
+    The parser layer already pairs per-set games into "6-7(5)" strings, so this
+    function mostly guards against older snapshot shapes.
+    """
+    if value is None:
+        return "—"
+    if isinstance(value, str):
+        return value if value.strip() else "—"
+    if isinstance(value, (list, tuple)):
+        parts = []
+        for item in value:
+            if isinstance(item, dict):
+                g = item.get("g")
+                tb = item.get("tb")
+                s = str(g) if g is not None else ""
+                if tb:
+                    s = f"{s}({tb})"
+                parts.append(s)
+            else:
+                parts.append(str(item))
+        joined = " ".join(p for p in parts if p)
+        return joined if joined else "—"
+    s = str(value)
+    return s if s.strip() else "—"
+
+
+# ---------------------------------------------------------------------------
+# Localised avatars
+# ---------------------------------------------------------------------------
+
+_AVATAR_DIR: str | None = None
+
+
+def _set_avatar_dir(path) -> None:
+    """Point the avatar renderer at the build's docs/assets/avatars directory."""
+    global _AVATAR_DIR
+    _AVATAR_DIR = str(path) if path else None
+
+
+def _local_avatar(remote_path: str) -> str:
+    """The site-local copy of a remote portrait, if the build downloaded one.
+
+    The returned value is a site-relative URL (``assets/avatars/<name>``), not a
+    filesystem path: pages are served from the repository root, so absolute local
+    paths would break every deployed image.
+    """
+    if not _AVATAR_DIR or not remote_path:
+        return ""
+    name = re.sub(r"[^A-Za-z0-9._-]", "_", remote_path.rsplit("/", 1)[-1])
+    candidate = os.path.join(_AVATAR_DIR, name)
+    if os.path.exists(candidate):
+        return f"assets/avatars/{name}"
+    return ""
+
+
+# ---------------------------------------------------------------------------
+# Static SVG helpers (pre-rendered, no client-side charting library)
+# ---------------------------------------------------------------------------
+
+
+def _num(value):
+    """A numeric cell that can be compared, or None when absent."""
+    if value is None or value == "":
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _winrate(p: dict) -> float | None:
+    career = p.get("career") or {}
+    w, l = career.get("w"), career.get("l")
+    if w is None or l is None or not (w + l):
+        return None
+    return round(100.0 * w / (w + l), 1)
 
 
 def _parse_date(value):
@@ -260,8 +349,11 @@ class Context:
         """
         Portrait URL.
 
-        Tennis Explorer hosts player photos under /res/img/player/; players
-        without one fall back to the CSS monogram layer behind the image.
+        Tennis Explorer hosts player photos under /res/img/player/.  During the
+        build the portraits are downloaded into docs/assets/avatars; when a local
+        copy exists it is served from the site itself so the dashboard no longer
+        depends on the upstream hotlink.  Players without a photo (local or
+        remote) fall back to the CSS monogram layer behind the image.
         """
         path = (player or {}).get("photo") if isinstance(player, dict) else None
         if not path:
@@ -269,6 +361,9 @@ class Context:
             path = (entry or {}).get("photo") or (entry or {}).get("p")
         if not path:
             return ""
+        local = _local_avatar(path)
+        if local:
+            return local
         return path if path.startswith("http") else f"https://www.tennisexplorer.com{path}"
 
     def avatar(self, player, size: int = 34, cls: str = "") -> str:
@@ -276,8 +371,9 @@ class Context:
         Official headshot.
 
         The fallback is pure CSS — a monogram on a court-green disc behind the
-        image — so a missing photo never leaves a broken icon and no inline
-        JavaScript is needed across the ~1,700 generated pages.
+        image — so a missing photo never leaves a broken icon.  If the remote
+        portrait fails to load, the one-line onerror handler hides the broken
+        image and reveals that same monogram, which is always present underneath.
         """
         initials = "".join(w[:1] for w in str(player.get("name") or "?").split()[:2]).upper()
         src = self.photo(player)
@@ -285,8 +381,101 @@ class Context:
         if src:
             # Only emit the image when there is one: an empty src makes the browser
             # request the page itself as an image, which shows up as a failed load.
+            # `onerror` hides the broken img so the CSS monogram beneath shows.
             img = (f'<img class="{esc(cls)}" src="{esc(src)}" alt="" loading="lazy" '
-                   f'width="{size}" height="{size}">')
+                   f'width="{size}" height="{size}" '
+                   'onerror="this.onerror=null;this.style.display=\'none\'">')
         return (f'<span class="av" style="--av:{size}px">'
                 f'<span class="av-mono" aria-hidden="true">{esc(initials)}</span>'
                 f'{img}</span>')
+
+    def trend_svg(self, player: dict, width: int = 560, height: int = 210) -> str:
+        """
+        A static SVG "career trend" panel: yearly main-tour titles as bars.
+
+        The ATP snapshot carries no week-by-week ranking history, so the honest
+        history we have is titles per season — plotted rather than invented.
+        """
+        by_year = (player.get("titles") or {}).get("byYear") or []
+        data = sorted([t for t in by_year if (t.get("main") or 0) > 0],
+                      key=lambda t: t["year"])[-10:]
+        if not data:
+            return ""
+        max_v = max(t["main"] for t in data) or 1
+        pad_l, pad_r, pad_t, pad_b = 8, 8, 22, 30
+        slot = (width - pad_l - pad_r) / len(data)
+        bars = []
+        for i, t in enumerate(data):
+            v = t["main"]
+            bh = (height - pad_t - pad_b) * (v / max_v)
+            x = pad_l + i * slot + slot * 0.22
+            bw = slot * 0.56
+            y = height - pad_b - bh
+            bars.append(
+                f'<g><rect class="trend-bar" x="{x:.1f}" y="{y:.1f}" '
+                f'width="{bw:.1f}" height="{bh:.1f}" rx="2"/>'
+                f'<text class="trend-tx" x="{x + bw / 2:.1f}" y="{y - 4:.1f}" '
+                f'text-anchor="middle">{v}</text>'
+                f'<text class="trend-tx2" x="{x + bw / 2:.1f}" y="{height - 8:.1f}" '
+                f'text-anchor="middle">{t["year"]}</text></g>'
+            )
+        axis = (f'<line class="trend-ax" x1="{pad_l:.1f}" y1="{height - pad_b:.1f}" '
+                f'x2="{width - pad_r:.1f}" y2="{height - pad_b:.1f}"/>')
+        return (f'<svg class="trend-box" viewBox="0 0 {width} {height}" role="img" '
+                f'aria-label="Titles per season">{axis}{"".join(bars)}</svg>')
+
+    def compare_svg(self, a: dict, b: dict, width: int = 640, height: int = 244) -> str:
+        """
+        A static SVG symmetric bar chart for the player comparison panel.
+
+        Each dimension is drawn as two halves: A grows left from the centre and
+        B grows right.  Rank is inverted (lower is better); win rate and titles
+        are scaled to the pair's best value.
+        """
+        dims = [
+            ("排名", "Rank", _num(a.get("rank")), _num(b.get("rank")), True),
+            ("积分", "Points", _num(a.get("points")), _num(b.get("points")), False),
+            ("赛季胜场", "Season W", _num((a.get("season") or {}).get("w")),
+             _num((b.get("season") or {}).get("w")), False),
+            ("生涯冠军", "Titles", _num((a.get("titles") or {}).get("main")),
+             _num((b.get("titles") or {}).get("main")), False),
+            ("生涯胜场", "Career W", _num((a.get("career") or {}).get("w")),
+             _num((b.get("career") or {}).get("w")), False),
+            ("胜率", "Win %", _winrate(a), _winrate(b), False),
+        ]
+        mid = width / 2
+        row_h = (height - 24) / len(dims)
+        half = (width - 240) / 2
+        rows = []
+        for i, (zh, en, av, bv, invert) in enumerate(dims):
+            y = 22 + i * row_h
+            max_v = max(av or 0, bv or 0) or 1
+            if invert:
+                a_ratio = (max_v - (av or max_v)) / max_v if av else 0
+                b_ratio = (max_v - (bv or max_v)) / max_v if bv else 0
+            else:
+                a_ratio = (av or 0) / max_v
+                b_ratio = (bv or 0) / max_v
+            a_w = half * max(0.0, a_ratio)
+            b_w = half * max(0.0, b_ratio)
+            rows.append(
+                f'<g>'
+                f'<text class="cmp-lbl" x="{mid:.1f}" y="{y + 8:.1f}" text-anchor="middle">'
+                f'<tspan>{esc(zh)}</tspan>'
+                f'<tspan class="cmp-lbl-en" dx="4">{esc(en)}</tspan></text>'
+                f'<rect class="cmp-bar-a" x="{mid - a_w:.1f}" y="{y:.1f}" '
+                f'width="{a_w:.1f}" height="12" rx="2"/>'
+                f'<rect class="cmp-bar-b" x="{mid:.1f}" y="{y:.1f}" '
+                f'width="{b_w:.1f}" height="12" rx="2"/>'
+                f'<text class="cmp-val" x="{mid - a_w - 6:.1f}" y="{y + 10:.1f}" '
+                f'text-anchor="end">{esc(num(av))}</text>'
+                f'<text class="cmp-val" x="{mid + b_w + 6:.1f}" y="{y + 10:.1f}">'
+                f'{esc(num(bv))}</text>'
+                f'</g>'
+            )
+        ha = esc((a.get("zh") or a.get("name") or ""))[:14]
+        hb = esc((b.get("zh") or b.get("name") or ""))[:14]
+        head = (f'<text class="cmp-name-a" x="{mid - 60:.1f}" y="12" text-anchor="end">{ha}</text>'
+                f'<text class="cmp-name-b" x="{mid + 60:.1f}" y="12">{hb}</text>')
+        return (f'<svg class="cmp-svg" viewBox="0 0 {width} {height}" role="img" '
+                f'aria-label="Player comparison">{head}{"".join(rows)}</svg>')
