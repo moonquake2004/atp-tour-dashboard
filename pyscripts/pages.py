@@ -277,7 +277,7 @@ def rankings(ctx: Context) -> str:
             high = f'#{p["highRank"]}' if p.get("highRank") else "—"
             return (
                 f'<tr><td>{p["rank"]}</td>'
-                f'<td class="l">{player_cell(ctx, p, avatar_on=(sort_key == "points"))}</td>'
+                f'<td class="l">{player_cell(ctx, p, country=False, avatar_on=(sort_key == "points"))}</td>'
                 f'<td class="c"><span class="tb-flag">{ctx.country(p["country"])}</span></td>'
                 f'<td>{ctx.move(p["move"])}</td>'
                 f'<td class="tb-num">{age}</td>'
