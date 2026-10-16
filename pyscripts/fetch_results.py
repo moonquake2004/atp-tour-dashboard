@@ -115,17 +115,25 @@ def _recompute_matches(store: dict, tournaments: dict) -> None:
 
 
 # Upper bounds for the number of completed singles matches an event of a given
-# level can plausibly contain.  The main draw of a Challenger caps at 128
-# (64 first-round matches), so any count near 1001 is a crawl artefact, not data.
+# level can plausibly contain *across its whole run*, qualifying included.
+#
+# These are deliberately loose.  They exist to catch a crawl artefact — the
+# biella-challenger event once reported 1001 matches — and that artefact was
+# repeated counting when a resumed run recounted days it had already stored.
+# The counter is now recomputed from the store, so each (day, tournament) pair
+# contributes exactly once and repetition is impossible.  A bound tight enough to
+# trip on real draws is worse than useless: a Challenger playing a week of
+# qualifying plus main draw legitimately reaches several hundred, so the old
+# 127 clamp was under-reporting real events (Palermo: 389 stored, shown as 127).
 LEVEL_MATCH_CAPS = {
-    "Grand Slam": 127,
-    "ATP Tour": 127,
-    "Challenger": 127,
-    "Tour Finals": 15,
-    "Olympics": 63,
-    "Team Cup": 300,
+    "Grand Slam": 900,
+    "ATP Tour": 900,
+    "Challenger": 900,
+    "Tour Finals": 60,
+    "Olympics": 300,
+    "Team Cup": 1200,
 }
-DEFAULT_MATCH_CAP = 127
+DEFAULT_MATCH_CAP = 900
 
 
 def _cap_for(level: str) -> int:

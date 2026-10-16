@@ -158,9 +158,25 @@ def main() -> int:
     check("every draw match has two distinct players",
           all(m["winner"]["id"] and m["loser"]["id"] and m["winner"]["id"] != m["loser"]["id"]
               for m in matches))
-    check("every draw has a final",
-          sum(1 for e in events.values() if any(r["code"] == "F" for r in e["rounds"]))
-          >= len(events) * 0.9)
+    # A draw only owes a final once its event is over and it is a bracket format.
+    # Team leagues (Bundesliga, Extraliga) and exhibitions have no final round by
+    # nature, and an event still in progress has not played one yet, so counting
+    # them against this check would only force the threshold down.
+    import datetime as _dt
+
+    def _owes_a_final(event: dict) -> bool:
+        if event.get("level") in ("Team Cup", "Exhibition"):
+            return False
+        name = (event.get("name") or "").lower()
+        if any(word in name for word in ("bundesliga", "extraliga", "boodles", "league")):
+            return False
+        end = event.get("end") or ""
+        return bool(end) and end < _dt.date.today().isoformat()
+
+    owing = [e for e in events.values() if _owes_a_final(e)]
+    check("every completed bracket draw has a final",
+          all(any(r["code"] == "F" for r in e["rounds"]) for e in owing),
+          f"{len(owing)} completed draws")
     check("no draw has two finals",
           all(sum(1 for r in e["rounds"] if r["code"] == "F") <= 1 for e in events.values()))
     check("draw rounds are ordered from the final down",

@@ -183,6 +183,31 @@ def main() -> int:
     # --------------------------------------------------------- player profiles
     ranked = {p["id"] for p in ctx.players}
     rival_ids = [p["id"] for p in ctx.players[:30] if p["id"] in pair_ids]
+    # Players named only in the results feed (qualifying entrants and lower-tier
+    # players outside the ranking table) also get a page — the feed links to them,
+    # so without one every such row is a dead link.
+    # The published feed is capped at the most recent matches, but the profiles
+    # built below link every opponent from the whole crawl — so the names must
+    # come from `daily`, not from the capped payload.  The source also gives the
+    # same player two slugs (lock-243e2 in a draw, lock-92b29 in one result row),
+    # and both are linked somewhere, so every referenced slug needs a page.
+    feed_only = 0
+    for day in daily.values():
+        for match in day.get("matches") or []:
+            for side in ("winner", "loser"):
+                person = match.get(side) or {}
+                pid = person.get("id")
+                if not pid or pid in ctx.h2h_players or (out / f"player-{pid}.html").exists():
+                    continue
+                ctx.h2h_players[pid] = {
+                    "id": pid, "name": person.get("name", ""), "zh": "",
+                    "country": person.get("country") or "", "flag": person.get("flag") or "",
+                    "rank": person.get("rank"), "photo": person.get("photo") or "",
+                }
+                write(f"player-{pid}.html", pages.player_page_light(ctx, ctx.h2h_players[pid]))
+                feed_only += 1
+    log("site", f"  ✓ {feed_only} results-only player pages")
+
     for player in ctx.players:
         pid = player["id"]
         rivals = []
@@ -231,6 +256,7 @@ def main() -> int:
             write(f"player-{pid}.html", pages.player_page_light(ctx, ctx.h2h_players[pid]))
             draw_only += 1
     log("site", f"  ✓ {draw_only} draw-only player pages")
+
 
     # ------------------------------------------------- retired champions
     # 名宿的档案页：生涯/分赛季/冠军/场地胜率是全的；交手与本赛季比赛为空，

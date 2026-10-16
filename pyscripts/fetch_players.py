@@ -25,6 +25,10 @@ from wtalib import env_int, log, read_json, write_json
 
 LIMIT = env_int("ATP_PLAYER_LIMIT", 300)
 WORKERS = env_int("ATP_PLAYER_WORKERS", 2)
+# Records are fetched once and kept, which is what makes a resumed run cheap — but
+# it also means they silently go stale as the season advances.  Setting this to 1
+# re-fetches every ranked player instead of only the new ones.
+REFRESH = env_int("ATP_PLAYER_REFRESH", 0)
 
 
 def main() -> int:
@@ -33,11 +37,16 @@ def main() -> int:
     if not targets:
         raise SystemExit("no rankings — run fetch_rankings.py first")
 
-    # Resume: records already stored are not re-fetched.
+    # Resume: records already stored are not re-fetched unless a refresh is asked
+    # for.  Without the refresh path the season W/L and title counts on every
+    # profile stay frozen at whatever the snapshot held when it was first built.
     bios: dict = read_json("bios.json", {}) or {}
     balances: dict = read_json("season-records.json", {}) or {}
     titles: dict = read_json("titles.json", {}) or {}
-    targets = [p for p in targets if p["id"] not in bios]
+    if REFRESH:
+        log("players", f"Refresh requested — re-fetching all {len(targets)} players.")
+    else:
+        targets = [p for p in targets if p["id"] not in bios]
     if not targets:
         log("players", f"Nothing to fetch — all {len(bios)} records already present.")
         return 0

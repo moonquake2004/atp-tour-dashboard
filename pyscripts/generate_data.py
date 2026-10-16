@@ -83,7 +83,8 @@ def main() -> int:
         return {
             "id": pid,
             "name": (bio.get("name") or legend.get("name") or (player or {}).get("name")
-                     or entry.get("n") or f"#{pid}"),
+                     or entry.get("n") or (crawl_names.get(pid) or {}).get("name")
+                     or f"#{pid}"),
             "zh": zh_name(pid),
             "country": (bio.get("country") or legend.get("country")
                         or (player or {}).get("country") or entry.get("c") or ""),
@@ -138,6 +139,18 @@ def main() -> int:
                         for y, r in sorted(table.items(), key=lambda kv: -int(kv[0]))[:12]
                         if r.get("total")],
         })
+
+    # Players who appear only in the results crawl — qualifying entrants and
+    # lower-tier players outside the ranking table.  Without this the feed fell
+    # back to "#id" for them and their names never reached the pages.
+    crawl_names: dict[str, dict] = {}
+    for day in daily:
+        for match in daily[day]["matches"]:
+            for side in ("winner", "loser"):
+                person = match.get(side) or {}
+                pid = person.get("id")
+                if pid and pid not in crawl_names:
+                    crawl_names[pid] = {"name": person.get("name") or ""}
 
     # ------------------------------------------------------ results feed
     results = []

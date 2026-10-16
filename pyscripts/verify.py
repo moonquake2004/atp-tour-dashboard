@@ -158,8 +158,21 @@ def main() -> int:
               for e in events.values() for r in e["rounds"] for m in r["matches"]))
     # A knockout round of n matches implies n*2 entrants.
     ladder = {"F": 1, "SF": 2, "QF": 4, "R16": 8, "R32": 16, "R64": 32, "R128": 64}
+    # A round only owes its full complement once the event has moved past it.
+    # A challenger still playing its quarter-finals legitimately holds 1 or 2 of
+    # the 4 QF matches, so rounds belonging to an unfinished event are skipped
+    # rather than counted as malformed.
+    import datetime as _dt
+
+    today = _dt.date.today().isoformat()
+
+    def _is_finished(event: dict) -> bool:
+        dates = event.get("dates") or []
+        return bool(dates) and max(dates) < today
+
     odd = [f'{e["name"]}/{r["code"]}'
-           for e in events.values() for r in e["rounds"]
+           for e in events.values() if _is_finished(e)
+           for r in e["rounds"]
            if r["code"] in ladder and len(r["matches"]) != ladder[r["code"]]]
     check("draw rounds have the size their code implies", not odd,
           f"{len(odd)} off (e.g. {odd[:2]})")

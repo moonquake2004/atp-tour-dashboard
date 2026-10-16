@@ -1174,7 +1174,9 @@ def event_page(ctx: Context, event: dict) -> str:
         a, b = m["winner"], m["loser"]
         seed_a = f'<span class="ev-seed">{a["seed"]}</span>' if a.get("seed") else ""
         seed_b = f'<span class="ev-seed">{b["seed"]}</span>' if b.get("seed") else ""
-        score = esc(" ".join(m.get("score") or []) or "—")
+        # The parser writes sets as {"g": games, "tb": tiebreak points} while older
+        # stored draws kept plain strings; format_score() is the shared normaliser.
+        score = esc(format_score(m.get("score")))
         return (
             '<div class="ev-match">'
             f'<div class="ev-side win">{seed_a}'
