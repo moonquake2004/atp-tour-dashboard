@@ -136,7 +136,8 @@ atp-dashboard/
 │   ├── atp_terms.py              Chinese terminology and curated transliterations
 │   ├── fetch_rankings.py         official singles ranking
 │   ├── fetch_players.py          biographies, season records, titles
-│   ├── fetch_results.py          day-by-day crawl → calendar + complete results
+│   ├── fetch_calendar.py         season calendar: dates, surface, prize
+│   ├── fetch_results.py          day-by-day crawl → complete results + event registry
 │   ├── fetch_events.py           complete per-event draws
 │   ├── fetch_h2h.py              folds results into a pairwise index
 │   ├── fetch_zh.py               Chinese names (Wikidata + variant conversion)
@@ -150,7 +151,7 @@ atp-dashboard/
 │   ├── verify_dashboard.py       payload integrity
 │   ├── check_links.py            verifies every internal link resolves
 │   ├── build.py                  full refresh orchestrator
-│   ├── refresh_rankings.py       light weekly refresh
+│   ├── refresh_rankings.py       weekly refresh (the whole pipeline)
 │   └── serve.py                  threaded preview server
 ├── site-py/assets/               stylesheet and social card
 ├── data/                         generated snapshots (committed)
@@ -175,10 +176,12 @@ python3 pyscripts/serve.py            # http://127.0.0.1:4174
 ### Refreshing data
 
 ```bash
-# full refresh: rankings, 300 player records, 259 days of results, every draw
+# full refresh: rankings, the season calendar, every result, the 300 player
+# records, every draw and the site
 python3 pyscripts/build.py
 
-# light weekly refresh: rankings → draws → derived → names → payload → site → verify
+# weekly refresh: the same pipeline with the depth the schedule needs
+# (player records re-fetched, results kept to the current season)
 python3 pyscripts/refresh_rankings.py
 
 # verify only
@@ -187,6 +190,14 @@ python3 pyscripts/verify.py && python3 pyscripts/verify_dashboard.py && python3 
 
 Every fetch step supports **resuming**: records already stored are not re-fetched,
 so a run interrupted by a network hiccup can simply be repeated.
+
+A refresh is only current if it includes the day-by-day results crawl.  A
+rankings-only run leaves the results feed frozen at the last time that crawl
+happened, which is exactly how the site once showed a month-old match list beside
+a current ranking table.  The weekly job therefore runs the whole pipeline; it
+re-fetches player records (their season W/L and title counts never move on their
+own) and re-reads draws for events played in the last ten days, so a bracket
+captured mid-tournament is completed once its later rounds exist.
 
 Environment variables: `ATP_RANK_DEPTH` (300), `ATP_PLAYER_LIMIT` (300),
 `ATP_MATCH_SEASONS` (4), `ATP_RESULT_SEASONS` (2), `ATP_EVENT_LIMIT` (400),

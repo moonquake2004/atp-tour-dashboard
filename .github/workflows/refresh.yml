@@ -1,9 +1,12 @@
 name: Refresh ATP data
 
-# The ATP publishes new rankings on Mondays. This workflow pulls the current
-# snapshot, rebuilds the derived aggregates and regenerates the static site.
+# The ATP publishes new rankings on Mondays.  The weekly run refreshes the whole
+# pipeline — rankings, the season calendar, the day-by-day results crawl, player
+# profiles, draws and the rebuilt site — because a rankings-only refresh leaves the
+# results feed frozen at the last time the crawl was run by hand.
 #
-# Manual runs can opt into a deeper refresh that also re-crawls results and draws.
+# Manual runs can ask for the plain build.py defaults instead (which resume
+# player records rather than refreshing them).
 
 on:
   schedule:
@@ -26,7 +29,7 @@ concurrency:
 jobs:
   refresh:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
 
@@ -34,7 +37,9 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Refresh rankings, calendar and the site
+      # Weekly: full pipeline (calendar + results crawl + profile refresh + site).
+      # A profile refresh is ~300 page fetches, which is why the timeout is 120 min.
+      - name: Weekly refresh
         if: ${{ github.event_name == 'schedule' || !inputs.deep }}
         run: python3 pyscripts/refresh_rankings.py
 

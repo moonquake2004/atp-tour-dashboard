@@ -19,7 +19,10 @@ from datetime import date, datetime, timedelta, timezone
 import te
 from wtalib import env_int, log, read_json, write_json
 
-SEASONS = env_int("ATP_RESULT_SEASONS", 2)
+# One season by default: that is what the site is built against and what the
+# published dataset contains.  Defaulting to two quietly doubled the crawl (and
+# the committed data) whenever this ran outside the weekly job, which pins it too.
+SEASONS = env_int("ATP_RESULT_SEASONS", 1)
 SEASON = env_int("ATP_SEASON", datetime.now(timezone.utc).year)
 TODAY = datetime.now(timezone.utc).date()
 

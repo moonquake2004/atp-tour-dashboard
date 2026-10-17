@@ -14,7 +14,7 @@ is capped.
 
 from __future__ import annotations
 
-from wtalib import env_int, log, read_json, write_json
+from wtalib import env_int, log, read_json, score_text, write_json
 
 MAX_MEETINGS = env_int("ATP_H2H_MAX", 24)
 

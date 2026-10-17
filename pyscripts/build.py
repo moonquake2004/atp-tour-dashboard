@@ -19,6 +19,13 @@ from wtalib import ROOT, log
 
 STEPS = [
     ("rankings", "fetch_rankings.py", False),
+    # The season calendar is the only source of an event's surface and prize, and
+    # the results feed joins against it to attach a surface to every match.
+    ("calendar", "fetch_calendar.py", False),
+    # The day-by-day crawl is what produces the results feed, the per-event match
+    # totals and the tournament registry the draw crawler consumes.  It was
+    # missing from this list, so a "full build" never refreshed any result.
+    ("results", "fetch_results.py", False),
     ("players", "fetch_players.py", True),
     ("matches", "fetch_matches.py", True),
     ("event-results", "fetch_events.py", True),
@@ -29,6 +36,7 @@ STEPS = [
     ("dashboard-data", "generate_data.py", False),
     ("dashboard-site", "build_site.py", False),
     ("verify-dashboard", "verify_dashboard.py", False),
+    ("verify", "verify.py", False),
     ("check-links", "check_links.py", False),
 ]
 
@@ -39,7 +47,10 @@ def main() -> int:
     here = Path(__file__).resolve().parent
 
     for name, script, skippable in STEPS:
-        if skippable and f"--skip-{name.split('-')[0]}s" in args:
+        # The flag is the step's own name: --skip-players, --skip-matches,
+        # --skip-event-results.  The previous form appended an "s" to the base name,
+        # so the documented "--skip-players" never actually matched anything.
+        if skippable and f"--skip-{name}" in args:
             log(name, f"skipped ({script})")
             continue
         print("\n" + "─" * 64 + f"\n▶ {script}\n" + "─" * 64, flush=True)
