@@ -27,7 +27,10 @@ STEPS = [
     # missing from this list, so a "full build" never refreshed any result.
     ("results", "fetch_results.py", False),
     ("players", "fetch_players.py", True),
-    ("matches", "fetch_matches.py", True),
+    # fetch_matches.py is deliberately absent: it writes a per-player season log
+    # that nothing here consumes — the profiles build their match lists from the
+    # day-by-day crawl instead — so running it meant fetching 300 logs for a file
+    # that was never read (and never committed).
     ("event-results", "fetch_events.py", True),
     ("h2h", "fetch_h2h.py", False),
     ("legends", "fetch_legends.py", True),
